@@ -21,12 +21,17 @@ concurrency:
 
 jobs:
   ci:
+    # contents: write e usado pelo job update-gitops, que commita a nova tag.
+    permissions:
+      contents: write
+      security-events: write
     uses: ./.github/workflows/_service-ci.yml
     with:
       service: evaluation-service
       language: go
       ecr_repository: togglemaster/evaluation-service
     secrets:
+      GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}

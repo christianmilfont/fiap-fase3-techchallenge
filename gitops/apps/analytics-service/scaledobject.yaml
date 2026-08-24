@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-service-scaler
+  namespace: analytics-service
+spec:
+  scaleTargetRef:
+    name: analytics-service
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        # SUBSTITUIR: troque <ACCOUNT_ID> pelo seu AWS Account ID (12 dígitos)
+        queueURL: https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/togglemaster-queue
+        queueLength: "5"
+        awsRegion: us-east-1
+      authenticationRef:
+        name: keda-sqs-trigger-auth

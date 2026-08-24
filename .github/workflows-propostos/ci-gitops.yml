@@ -1,0 +1,52 @@
+name: CI gitops
+
+# Valida os manifests antes de o ArgoCD tentar aplicá-los no cluster: um YAML
+# inválido em main deixaria as Applications OutOfSync sem sinal no CI.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gitops/**"
+      - ".github/workflows/ci-gitops.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "gitops/**"
+      - ".github/workflows/ci-gitops.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-gitops-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Kustomize build + kubeconform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar kustomize e kubeconform
+        run: |
+          curl -fsSL -o /tmp/kustomize.tar.gz \
+            https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz
+          tar -xzf /tmp/kustomize.tar.gz -C /usr/local/bin
+          curl -fsSL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+
+      - name: Validar os overlays dos 5 servicos
+        run: |
+          for dir in gitops/apps/*/; do
+            echo "== $dir"
+            # ScaledObject/TriggerAuthentication (KEDA) sao CRDs: sem schema no
+            # catalogo padrao, entao ficam ignorados em vez de falhar o job.
+            kustomize build "$dir" | kubeconform -strict -summary -ignore-missing-schemas
+          done
+
+      - name: Validar as Applications do ArgoCD
+        run: kubeconform -strict -summary -ignore-missing-schemas gitops/argocd

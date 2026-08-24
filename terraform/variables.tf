@@ -172,6 +172,36 @@ variable "ecr_repository_names" {
   ]
 }
 
+variable "enable_argocd" {
+  description = "Instala o ArgoCD no cluster (exige acesso à API do EKS na hora do apply)."
+  type        = bool
+  default     = true
+}
+
+variable "argocd_chart_version" {
+  description = "Versão do chart argo-cd."
+  type        = string
+  default     = "7.7.11"
+}
+
+variable "argocd_server_service_type" {
+  description = "Tipo do Service do argocd-server (LoadBalancer expõe a UI)."
+  type        = string
+  default     = "LoadBalancer"
+}
+
+variable "gitops_repo_url" {
+  description = "Repositório monitorado pelo ArgoCD."
+  type        = string
+  default     = "https://github.com/christianmilfont/fiap-fase3-techchallenge.git"
+}
+
+variable "gitops_revision" {
+  description = "Branch monitorada pelo ArgoCD."
+  type        = string
+  default     = "main"
+}
+
 variable "tags" {
   description = "Tags adicionais aplicadas a todos os recursos."
   type        = map(string)

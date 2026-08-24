@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: analytics-service
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/name: analytics-service
+      app.kubernetes.io/part-of: togglemaster
+      app.kubernetes.io/managed-by: argocd
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - serviceaccount.yaml
+  - scaledobject.yaml
+  - trigger-auth.yaml
+
+# Atualizado automaticamente pelo job update-gitops do CI:
+#   kustomize edit set image togglemaster/analytics-service=<registry>/togglemaster/analytics-service:<tag>
+images:
+  - name: togglemaster/analytics-service
+    newName: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/togglemaster/analytics-service
+    newTag: latest
