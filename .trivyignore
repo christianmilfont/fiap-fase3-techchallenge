@@ -1,0 +1,13 @@
+# Excecoes do scan de IaC (trivy config) do diretorio terraform/.
+# Cada entrada precisa de justificativa; o resto continua bloqueando o pipeline.
+
+# AVD-AWS-0040 / AVD-AWS-0041: endpoint publico do EKS liberado.
+# O ambiente AWS Academy nao tem VPN/bastion, entao o kubectl precisa alcancar o
+# control plane pela internet. Em producao real seria endpoint privado.
+AVD-AWS-0040
+AVD-AWS-0041
+
+# AVD-AWS-0104: egress 0.0.0.0/0 nos security groups (EKS, RDS, ElastiCache).
+# Saida liberada e necessaria para pull de imagens do ECR e endpoints AWS sem
+# VPC endpoints, que a conta do lab nao provisiona.
+AVD-AWS-0104
