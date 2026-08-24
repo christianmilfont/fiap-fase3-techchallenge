@@ -271,7 +271,7 @@ Os manifests da Fase 2 têm `<ACCOUNT_ID>` e `<ELASTICACHE-ENDPOINT>`, que só e
 
 ---
 
-## Ordem de execução (quando for rodar de verdade)
+## Ordem de execução
 
 ```bash
 # 1. bucket do estado (uma vez só)
@@ -296,7 +296,6 @@ terraform output -raw argocd_admin_password_command | bash
 ```
 
 No GitHub, antes de o CI rodar:
-- renomear `.github/workflows-propostos` → `.github/workflows`;
 - secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (o último expira a cada sessão do lab);
 - Settings → Actions → General → **Workflow permissions: Read and write** (sem isso o `update-gitops` não commita).
 
