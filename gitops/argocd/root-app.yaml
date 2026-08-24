@@ -1,0 +1,26 @@
+# App of apps: uma unica Application que sincroniza o AppProject e as
+# Applications dos 5 microsservicos. E o unico manifesto que precisa ser
+# aplicado a mao caso o ArgoCD nao seja instalado pelo Terraform.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: togglemaster-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/christianmilfont/fiap-fase3-techchallenge.git
+    targetRevision: main
+    path: gitops/argocd
+    directory:
+      recurse: true
+      exclude: root-app.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

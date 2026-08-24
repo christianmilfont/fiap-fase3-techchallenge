@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: togglemaster
+  namespace: argocd
+spec:
+  description: Microsservicos do ToggleMaster
+  sourceRepos:
+    - https://github.com/christianmilfont/fiap-fase3-techchallenge.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*-service"
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

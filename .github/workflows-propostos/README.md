@@ -17,6 +17,7 @@ Um workflow por microserviço (`ci-<serviço>.yml`), todos chamando o pipeline r
 | `ci-evaluation-service.yml` | evaluation-service | Go 1.25 | `togglemaster/evaluation-service` |
 | `ci-analytics-service.yml` | analytics-service | Python 3.11 + uv | `togglemaster/analytics-service` |
 | `ci-terraform.yml` | infra | Terraform 1.12 | — |
+| `ci-gitops.yml` | manifests | Kustomize + kubeconform | — |
 
 Disparo: `pull_request` e `push` na `main`, filtrados pelo path do serviço (+ `workflow_dispatch`).
 
@@ -34,8 +35,11 @@ commitadas diretamente neste repo, para que os pipelines consigam compilar e bui
    `gosec` (Go) / `bandit` (Python) no código fonte, ambos bloqueando em severidade HIGH
    e com uma segunda execução informativa nas severidades menores.
 4. **Docker Build & Push** — build da imagem, `trivy image` e push no ECR.
+5. **Atualizar tag no GitOps** — `kustomize edit set image` em `gitops/apps/<serviço>`
+   e commit na `main`. Só roda em `push` na `main`.
 
-Os três primeiros jobs rodam em paralelo; o `docker` depende dos três (`needs`).
+Os três primeiros jobs rodam em paralelo; o `docker` depende dos três (`needs`) e o
+`update-gitops` depende do `docker`.
 
 ### Regra de bloqueio
 
@@ -69,6 +73,16 @@ Só acontece em `push` na `main` — em Pull Request o pipeline vai até o conta
 O prefixo `v1.0.0` vem do input `image_version` do workflow reutilizável; o sufixo é o
 commit hash curto.
 
+### Entrega contínua (GitOps)
+
+Não há `kubectl apply` no CI. Depois do push da imagem, o job `update-gitops` escreve a
+mesma tag em `gitops/apps/<serviço>/kustomization.yaml` e commita na `main` — o ArgoCD
+vê o commit e sincroniza o cluster. Detalhes em `gitops/README.md`.
+
+Os commits dos 5 pipelines disputam a mesma branch, então o job usa
+`concurrency: gitops-write` (serializa) e, se ainda assim o push for rejeitado, refaz o
+`git pull --rebase` e tenta de novo, até 5 vezes.
+
 ## Secrets necessários
 
 Em **Settings → Secrets and variables → Actions**:
@@ -78,6 +92,7 @@ Em **Settings → Secrets and variables → Actions**:
 | `AWS_ACCESS_KEY_ID` | credenciais do AWS Academy |
 | `AWS_SECRET_ACCESS_KEY` | |
 | `AWS_SESSION_TOKEN` | obrigatório no Academy (credenciais temporárias, expiram a cada sessão do lab) |
+| `GITOPS_TOKEN` | opcional. Com o GitOps neste mesmo repo, o `GITHUB_TOKEN` já basta (o job pede `contents: write`); só é necessário se você mover `gitops/` para outro repositório |
 
 Os repositórios ECR são criados pelo módulo `ecr` do Terraform (`terraform/`), com os
 mesmos nomes usados aqui.

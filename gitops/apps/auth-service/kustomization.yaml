@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: auth-service
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/name: auth-service
+      app.kubernetes.io/part-of: togglemaster
+      app.kubernetes.io/managed-by: argocd
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+# Atualizado automaticamente pelo job update-gitops do CI:
+#   kustomize edit set image togglemaster/auth-service=<registry>/togglemaster/auth-service:<tag>
+images:
+  - name: togglemaster/auth-service
+    newName: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service
+    newTag: latest

@@ -77,3 +77,18 @@ output "ecr_repository_urls" {
   description = "URLs dos repositórios ECR."
   value       = module.ecr.repository_urls
 }
+
+output "argocd_namespace" {
+  description = "Namespace do ArgoCD (null quando enable_argocd = false)."
+  value       = var.enable_argocd ? module.argocd[0].namespace : null
+}
+
+output "argocd_admin_password_command" {
+  description = "Comando para ler a senha inicial do admin do ArgoCD."
+  value       = var.enable_argocd ? module.argocd[0].admin_password_command : null
+}
+
+output "argocd_server_url_command" {
+  description = "Comando para descobrir o DNS do LoadBalancer da UI do ArgoCD."
+  value       = var.enable_argocd ? module.argocd[0].server_url_command : null
+}

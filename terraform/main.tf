@@ -94,3 +94,15 @@ module "ecr" {
   repository_names = var.ecr_repository_names
   tags             = local.tags
 }
+
+module "argocd" {
+  source = "./modules/argocd"
+  count  = var.enable_argocd ? 1 : 0
+
+  chart_version       = var.argocd_chart_version
+  server_service_type = var.argocd_server_service_type
+  gitops_repo_url     = var.gitops_repo_url
+  gitops_revision     = var.gitops_revision
+
+  depends_on = [module.eks]
+}

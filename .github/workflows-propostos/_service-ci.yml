@@ -1,8 +1,10 @@
 name: Service CI (reusable)
 
 # Pipeline compartilhado pelos 5 microservicos.
-# Estagios: Build & Unit Test -> Lint/Static Analysis -> Security Scan (SCA + SAST) -> Docker Build & Push.
+# Estagios: Build & Unit Test -> Lint/Static Analysis -> Security Scan (SCA + SAST)
+#           -> Docker Build & Push -> Atualizacao do repositorio GitOps.
 # Qualquer vulnerabilidade CRITICAL (dependencias, codigo ou imagem) falha o pipeline.
+# O deploy em si e do ArgoCD: o CI so escreve a nova tag em gitops/apps/<servico>.
 
 on:
   workflow_call:
@@ -36,7 +38,15 @@ on:
         required: false
         type: string
         default: us-east-1
+      gitops_path:
+        description: Diretorio kustomize do servico no repositorio GitOps.
+        required: false
+        type: string
+        default: ""
     secrets:
+      GITOPS_TOKEN:
+        description: Token com permissao de escrita no repositorio GitOps. Sem ele, usa o GITHUB_TOKEN do job.
+        required: false
       AWS_ACCESS_KEY_ID:
         required: false
       AWS_SECRET_ACCESS_KEY:
@@ -44,14 +54,15 @@ on:
       AWS_SESSION_TOKEN:
         required: false
 
-permissions:
-  contents: read
-  security-events: write
-
+# Permissoes por job: so update-gitops escreve no repositorio. Declarar
+# contents: read no nivel do workflow limitaria esse job mesmo com o caller
+# concedendo write.
 jobs:
   build-test:
     name: Build & Unit Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: ${{ inputs.service }}
@@ -97,6 +108,8 @@ jobs:
   lint:
     name: Linter / Static Analysis
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: ${{ inputs.service }}
@@ -138,6 +151,9 @@ jobs:
   security-scan:
     name: Security Scan (SAST & SCA)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -207,6 +223,11 @@ jobs:
     name: Docker Build & Push
     needs: [build-test, lint, security-scan]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      registry: ${{ steps.ecr.outputs.registry }}
     steps:
       - uses: actions/checkout@v4
 
@@ -263,3 +284,62 @@ jobs:
           docker push $REGISTRY/$REPOSITORY:$TAG
           docker push $REGISTRY/$REPOSITORY:latest
           echo "Imagem publicada: $REGISTRY/$REPOSITORY:$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  # Entrega continua via GitOps: nada de kubectl apply aqui. O commit abaixo e o
+  # unico gatilho de deploy — o ArgoCD observa a main e sincroniza o cluster.
+  update-gitops:
+    name: Atualizar tag no GitOps
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Os 5 servicos escrevem no mesmo diretorio; sem a fila os pushes se atropelam.
+    concurrency:
+      group: gitops-write
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN || github.token }}
+
+      - name: Instalar kustomize
+        run: |
+          curl -fsSL -o /tmp/kustomize.tar.gz \
+            https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz
+          tar -xzf /tmp/kustomize.tar.gz -C /usr/local/bin
+          kustomize version
+
+      - name: Escrever a nova tag no manifesto
+        env:
+          DIR: ${{ inputs.gitops_path != '' && inputs.gitops_path || format('gitops/apps/{0}', inputs.service) }}
+          IMAGE: ${{ needs.docker.outputs.registry }}/${{ inputs.ecr_repository }}
+          TAG: ${{ needs.docker.outputs.image_tag }}
+        run: |
+          cd "$DIR"
+          kustomize edit set image "togglemaster/${{ inputs.service }}=$IMAGE:$TAG"
+          kustomize build . | grep 'image:'
+
+      - name: Commit e push
+        env:
+          DIR: ${{ inputs.gitops_path != '' && inputs.gitops_path || format('gitops/apps/{0}', inputs.service) }}
+          TAG: ${{ needs.docker.outputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- "$DIR"; then
+            echo "Manifesto ja aponta para $TAG — nada a commitar."
+            exit 0
+          fi
+          git add "$DIR"
+          git commit -m "chore(gitops): ${{ inputs.service }} -> $TAG"
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              echo "Manifesto atualizado para $TAG — ArgoCD sincroniza a partir daqui." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Push rejeitado (tentativa $attempt); rebase e nova tentativa."
+            git pull --rebase origin main
+          done
+          exit 1
