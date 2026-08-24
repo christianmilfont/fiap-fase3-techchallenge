@@ -1,0 +1,3 @@
+bucket = "togglemaster-tfstate-<sufixo-unico>"
+key    = "togglemaster/infra.tfstate"
+region = "us-east-1"

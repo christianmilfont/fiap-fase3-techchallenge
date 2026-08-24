@@ -1,0 +1,39 @@
+project_name = "togglemaster"
+environment  = "prod"
+aws_region   = "us-east-1"
+
+availability_zones   = ["us-east-1a", "us-east-1b"]
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.0.0/20", "10.0.16.0/20"]
+private_subnet_cidrs = ["10.0.128.0/20", "10.0.144.0/20"]
+
+kubernetes_version = "1.30"
+lab_role_name      = "LabRole"
+
+node_groups = {
+  standard-workers = {
+    instance_types = ["t3.medium"]
+    desired_size   = 2
+    min_size       = 1
+    max_size       = 4
+    subnet_type    = "private"
+  }
+}
+
+databases = {
+  auth-db      = { db_name = "auth_db" }
+  flag-db      = { db_name = "flags_db" }
+  targeting-db = { db_name = "targeting_db" }
+}
+
+redis_node_type     = "cache.t3.micro"
+dynamodb_table_name = "ToggleMasterAnalytics"
+sqs_queue_name      = "togglemaster-queue"
+
+ecr_repository_names = [
+  "togglemaster/auth-service",
+  "togglemaster/flag-service",
+  "togglemaster/targeting-service",
+  "togglemaster/evaluation-service",
+  "togglemaster/analytics-service",
+]
