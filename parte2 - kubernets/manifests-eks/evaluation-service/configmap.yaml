@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: evaluation-service-config
+  namespace: evaluation-service
+data:
+  PORT: "8004"
+  # SUBSTITUIR: troque <ELASTICACHE-ENDPOINT> pelo endpoint do ElastiCache (ETAPA 3)
+  REDIS_URL: "redis://<ELASTICACHE-ENDPOINT>:6379"
+  FLAG_SERVICE_URL: "http://flag-service.flag-service.svc.cluster.local:8002"
+  TARGETING_SERVICE_URL: "http://targeting-service.targeting-service.svc.cluster.local:8003"
+  AWS_REGION: "us-east-1"
+  # SUBSTITUIR: troque <ACCOUNT_ID> pelo seu AWS Account ID (12 dígitos)
+  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/<ACCOUNT_ID>/togglemaster-queue"

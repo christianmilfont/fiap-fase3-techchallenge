@@ -1,0 +1,23 @@
+services:
+  floci:
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    image: floci/floci:latest
+    user: root
+    container_name: floci-k8s
+    environment:
+      - FLOCI_DOCKER_LOG_MAX_FILE=3
+      - FLOCI_DOCKER_LOG_MAX_SIZE=10m
+    ports:
+      - "4566:4566"
+      - "6379-6399:6379-6399"
+      - "7001-7099:7001-7099"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./application.yml:/app/application.yml
+      - ./floci-k8s-data:/app/data
+    restart: unless-stopped
+

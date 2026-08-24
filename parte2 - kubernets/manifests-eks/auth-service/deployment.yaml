@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: auth-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          # SUBSTITUIR: troque <ACCOUNT_ID> pelo seu AWS Account ID (12 dígitos)
+          image: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/togglemaster/auth-service:latest
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - secretRef:
+                name: auth-service-secret
+            - configMapRef:
+                name: auth-service-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 20

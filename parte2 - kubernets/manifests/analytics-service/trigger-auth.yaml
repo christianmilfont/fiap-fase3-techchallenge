@@ -1,0 +1,13 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-sqs-trigger-auth
+  namespace: analytics-service
+spec:
+  secretTargetRef:
+    - parameter: awsAccessKeyID
+      name: analytics-service-secret
+      key: AWS_ACCESS_KEY_ID
+    - parameter: awsSecretAccessKey
+      name: analytics-service-secret
+      key: AWS_SECRET_ACCESS_KEY

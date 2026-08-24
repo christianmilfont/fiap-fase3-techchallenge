@@ -1,0 +1,8 @@
+floci:
+  hostname: localhost
+  storage:
+    mode: persistent
+    persistent-path: /app/data
+  services:
+    ecr:
+      uri-style: path

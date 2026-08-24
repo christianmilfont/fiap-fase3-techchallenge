@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flag-service
+  namespace: flag-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flag-service
+  template:
+    metadata:
+      labels:
+        app: flag-service
+    spec:
+      imagePullSecrets:
+        - name: ecr-registry-secret
+      containers:
+        - name: flag-service
+          image: host.minikube.internal:5100/000000000000/togglemaster/flag-service:latest
+          ports:
+            - containerPort: 8002
+          envFrom:
+            - secretRef:
+                name: flag-service-secret
+            - configMapRef:
+                name: flag-service-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 15
+            periodSeconds: 20

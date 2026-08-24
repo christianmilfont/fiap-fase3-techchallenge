@@ -1,0 +1,236 @@
+services:
+  # ── INFRA (5 DBs) ─────────────────────────────────────
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: postgres-auth-DB1
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: America/Sao_Paulo
+    volumes:
+      - pg_auth_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - toggleMaster
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
+
+  postgres-flags:
+    image: postgres:15-alpine
+    container_name: postgres-flags-DB2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: flags_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: America/Sao_Paulo
+    volumes:
+      - pg_flags_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - toggleMaster
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
+
+  postgres-targeting:
+    image: postgres:15-alpine
+    container_name: postgres-targeting-DB3
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: targeting_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: America/Sao_Paulo
+    volumes:
+      - pg_targeting_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - toggleMaster
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    container_name: redis-DB4
+    image: redis:7-alpine
+    environment:
+      TZ: America/Sao_Paulo
+    ports:
+      - "6379:6379"
+    networks:
+      - toggleMaster
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  floci:
+    container_name: floci-DB5
+    image: floci/floci:latest-compat
+    ports:
+      - "4566:4566"
+    environment:
+      FLOCI_HOSTNAME: floci
+      FLOCI_BASE_URL: http://floci:4566
+      FLOCI_DEFAULT_REGION: ${AWS_REGION}
+    volumes:
+      - ./scripts/floci-init.sh:/etc/localstack/init/ready.d/init.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 15s
+    networks:
+      - toggleMaster
+
+  # ── APPS (5 serviços) ──────────────────────────────────
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service-APP1
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db
+      PORT: "8001"
+      MASTER_KEY: ${MASTER_KEY}
+      TZ: America/Sao_Paulo
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    networks:
+      - toggleMaster
+
+  flag-service:
+    build: ./flag-service
+    container_name: flag-service-APP2
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres-flags:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres-flags:5432/flags_db
+      PORT: "8002"
+      AUTH_SERVICE_URL: http://auth-service:8001
+      TZ: America/Sao_Paulo
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    networks:
+      - toggleMaster
+
+  targeting-service:
+    build: ./targeting-service
+    container_name: targeting-service-APP3
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres-targeting:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres-targeting:5432/targeting_db
+      PORT: "8003"
+      AUTH_SERVICE_URL: http://auth-service:8001
+      TZ: America/Sao_Paulo
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    networks:
+      - toggleMaster
+
+  evaluation-service:
+    build: ./evaluation-service
+    container_name: evaluation-service-APP4
+    ports:
+      - "8004:8004"
+    depends_on:
+      redis:
+        condition: service_healthy
+      flag-service:
+        condition: service_started
+      targeting-service:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    env_file: .env
+    environment:
+      PORT: "8004"
+      REDIS_URL: redis://redis:6379
+      FLAG_SERVICE_URL: http://flag-service:8002
+      TARGETING_SERVICE_URL: http://targeting-service:8003
+      TZ: America/Sao_Paulo
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    networks:
+      - toggleMaster
+
+  analytics-service:
+    build: ./analytics-service
+    container_name: analytics-service-APP5
+    ports:
+      - "8005:8005"
+    depends_on:
+      floci:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started  
+    env_file: .env
+    environment:
+      PORT: "8005"
+      TZ: America/Sao_Paulo
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    networks:
+      - toggleMaster
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.130.0
+    container_name: otel-collector
+    command:
+      - "--config=/etc/otelcol/config.yaml"
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - jaeger
+    networks:
+      - toggleMaster
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.66.0
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4319:4317"
+    networks:
+      - toggleMaster
+
+  # ── NETWORKS ──────────────────────────────────────────────────
+networks:
+  toggleMaster:
+
+# ── VOLUMES ───────────────────────────────────────────────────
+volumes:
+  pg_auth_data:
+  pg_flags_data:
+  pg_targeting_data:

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: targeting-service
+  namespace: targeting-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: targeting-service
+  template:
+    metadata:
+      labels:
+        app: targeting-service
+    spec:
+      imagePullSecrets:
+        - name: ecr-registry-secret
+      containers:
+        - name: targeting-service
+          image: host.minikube.internal:5100/000000000000/togglemaster/targeting-service:latest
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - secretRef:
+                name: targeting-service-secret
+            - configMapRef:
+                name: targeting-service-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 15
+            periodSeconds: 20

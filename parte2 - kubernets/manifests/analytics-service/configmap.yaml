@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-service-config
+  namespace: analytics-service
+data:
+  PORT: "8005"
+  AWS_REGION: "us-east-1"
+  AWS_ENDPOINT_URL: "http://host.minikube.internal:4566"
+  AWS_SQS_URL: "http://host.minikube.internal:4566/000000000000/togglemaster-queue"
+  AWS_DYNAMODB_TABLE: "ToggleMasterAnalytics"
