@@ -1,0 +1,265 @@
+name: Service CI (reusable)
+
+# Pipeline compartilhado pelos 5 microservicos.
+# Estagios: Build & Unit Test -> Lint/Static Analysis -> Security Scan (SCA + SAST) -> Docker Build & Push.
+# Qualquer vulnerabilidade CRITICAL (dependencias, codigo ou imagem) falha o pipeline.
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Nome do servico (tambem e o diretorio no repo).
+        required: true
+        type: string
+      language:
+        description: '"go" ou "python".'
+        required: true
+        type: string
+      ecr_repository:
+        description: Repositorio ECR de destino.
+        required: true
+        type: string
+      go_version:
+        required: false
+        type: string
+        default: "1.25"
+      python_version:
+        required: false
+        type: string
+        default: "3.11"
+      image_version:
+        description: Prefixo da tag da imagem (tag final = <image_version>-<sha curto>).
+        required: false
+        type: string
+        default: v1.0.0
+      aws_region:
+        required: false
+        type: string
+        default: us-east-1
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      AWS_SESSION_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  build-test:
+    name: Build & Unit Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache-dependency-path: ${{ inputs.service }}/go.sum
+
+      - name: Build (Go)
+        if: inputs.language == 'go'
+        run: go build ./...
+
+      - name: Unit tests (Go)
+        if: inputs.language == 'go'
+        run: go test ./... -v
+
+      - if: inputs.language == 'python'
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install (Python)
+        if: inputs.language == 'python'
+        run: uv sync --frozen
+
+      - name: Compile check (Python)
+        if: inputs.language == 'python'
+        run: uv run python -m compileall -q *.py
+
+      - name: Unit tests (Python)
+        if: inputs.language == 'python'
+        run: |
+          if compgen -G "tests/test_*.py" > /dev/null || compgen -G "test_*.py" > /dev/null; then
+            uv run --with pytest pytest -q
+          else
+            echo "Nenhum teste unitario encontrado — etapa ignorada."
+          fi
+
+  lint:
+    name: Linter / Static Analysis
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache-dependency-path: ${{ inputs.service }}/go.sum
+
+      - name: go vet
+        if: inputs.language == 'go'
+        run: go vet ./...
+
+      - name: golangci-lint
+        if: inputs.language == 'go'
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: ${{ inputs.service }}
+          args: --timeout=5m
+
+      - if: inputs.language == 'python'
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: flake8 (erros bloqueantes)
+        if: inputs.language == 'python'
+        run: uvx flake8 . --exclude=.venv --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: flake8 (estilo, informativo)
+        if: inputs.language == 'python'
+        continue-on-error: true
+        run: uvx flake8 . --exclude=.venv --count --max-line-length=120 --statistics
+
+  security-scan:
+    name: Security Scan (SAST & SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # SCA — vulnerabilidades nas dependencias. CRITICAL falha o job.
+      - name: Trivy fs (SCA) — falha em CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ inputs.service }}
+          scanners: vuln,secret
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      - name: Trivy fs — relatorio completo (informativo)
+        if: always()
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ inputs.service }}
+          scanners: vuln
+          severity: HIGH,MEDIUM
+          exit-code: "0"
+          format: table
+
+      # SAST — vulnerabilidades no codigo fonte.
+      - if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache-dependency-path: ${{ inputs.service }}/go.sum
+
+      # G704 (SSRF por taint analysis) fica fora do bloqueio: as URLs dos servicos
+      # internos vem de variaveis de ambiente/ConfigMap, nao de entrada do usuario.
+      - name: gosec (SAST Go) — falha em severidade HIGH
+        if: inputs.language == 'go'
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -severity high -confidence medium -exclude=G704 ./...
+        working-directory: ${{ inputs.service }}
+
+      - name: gosec — relatorio completo (informativo)
+        if: inputs.language == 'go'
+        continue-on-error: true
+        run: gosec -severity medium ./...
+        working-directory: ${{ inputs.service }}
+
+      - if: inputs.language == 'python'
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: bandit (SAST Python) — falha em severidade HIGH
+        if: inputs.language == 'python'
+        run: uvx bandit -r . -lll -x ./.venv
+        working-directory: ${{ inputs.service }}
+
+      - name: bandit — relatorio MEDIUM (informativo)
+        if: inputs.language == 'python'
+        continue-on-error: true
+        run: uvx bandit -r . -ll -x ./.venv
+        working-directory: ${{ inputs.service }}
+
+  docker:
+    name: Docker Build & Push
+    needs: [build-test, lint, security-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir tag da imagem
+        id: meta
+        run: echo "tag=${{ inputs.image_version }}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.service }}
+          push: false
+          load: true
+          tags: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Container scan — CRITICAL na imagem tambem bloqueia o push.
+      - name: Trivy image — falha em CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ inputs.service }}:${{ steps.meta.outputs.tag }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      # Push somente na main; em Pull Request o pipeline para no scan da imagem.
+      - name: Configurar credenciais AWS
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Login no ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push para o ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPOSITORY: ${{ inputs.ecr_repository }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker tag ${{ inputs.service }}:$TAG $REGISTRY/$REPOSITORY:$TAG
+          docker tag ${{ inputs.service }}:$TAG $REGISTRY/$REPOSITORY:latest
+          docker push $REGISTRY/$REPOSITORY:$TAG
+          docker push $REGISTRY/$REPOSITORY:latest
+          echo "Imagem publicada: $REGISTRY/$REPOSITORY:$TAG" >> "$GITHUB_STEP_SUMMARY"

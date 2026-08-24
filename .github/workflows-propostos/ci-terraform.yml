@@ -1,0 +1,66 @@
+name: CI terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/ci-terraform.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/ci-terraform.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Format, Validate & Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: terraform fmt
+        run: terraform fmt -recursive -check -diff
+        working-directory: terraform
+
+      - name: terraform validate (raiz)
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+        working-directory: terraform
+
+      - name: terraform validate (bootstrap)
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+        working-directory: terraform/bootstrap
+
+      # IaC misconfiguration scan — CRITICAL bloqueia o pipeline.
+      - name: Trivy config — falha em CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: CRITICAL
+          exit-code: "1"
+          format: table
+          trivyignores: .trivyignore
+
+      - name: Trivy config — relatorio completo (informativo)
+        if: always()
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,MEDIUM
+          exit-code: "0"
+          format: table

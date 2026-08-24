@@ -1,0 +1,32 @@
+name: CI auth-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "auth-service/**"
+      - ".github/workflows/ci-auth-service.yml"
+      - ".github/workflows/_service-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "auth-service/**"
+      - ".github/workflows/ci-auth-service.yml"
+      - ".github/workflows/_service-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-auth-service-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_service-ci.yml
+    with:
+      service: auth-service
+      language: go
+      ecr_repository: togglemaster/auth-service
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
