@@ -58,12 +58,6 @@ variable "kubernetes_version" {
   default     = "1.30"
 }
 
-variable "lab_role_name" {
-  description = "Role existente usada pelo EKS (AWS Academy: LabRole)."
-  type        = string
-  default     = "LabRole"
-}
-
 variable "enable_oidc_provider" {
   description = "Cria o IAM OIDC provider do cluster (necessário para IRSA/KEDA)."
   type        = bool

@@ -1,5 +1,66 @@
-data "aws_iam_role" "lab" {
-  name = var.lab_role_name
+# IAM Role para o cluster EKS
+resource "aws_iam_role" "cluster" {
+  name = "${var.cluster_name}-cluster-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "eks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-cluster-role" })
+}
+
+resource "aws_iam_role_policy_attachment" "clusterAmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.cluster.name
+}
+
+resource "aws_iam_role_policy_attachment" "clusterAmazonEKSVPCResourceController" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.cluster.name
+}
+
+# IAM Role para os node groups
+resource "aws_iam_role" "nodes" {
+  name = "${var.cluster_name}-nodes-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-nodes-role" })
+}
+
+resource "aws_iam_role_policy_attachment" "nodesAmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.nodes.name
+}
+
+resource "aws_iam_role_policy_attachment" "nodesAmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.nodes.name
+}
+
+resource "aws_iam_role_policy_attachment" "nodesAmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.nodes.name
 }
 
 resource "aws_security_group" "cluster" {
@@ -21,7 +82,7 @@ resource "aws_security_group" "cluster" {
 resource "aws_eks_cluster" "this" {
   name     = var.cluster_name
   version  = var.kubernetes_version
-  role_arn = data.aws_iam_role.lab.arn
+  role_arn = aws_iam_role.cluster.arn
 
   vpc_config {
     subnet_ids              = concat(var.private_subnet_ids, var.public_subnet_ids)
@@ -62,7 +123,7 @@ resource "aws_eks_node_group" "this" {
 
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "${var.cluster_name}-${each.key}"
-  node_role_arn   = data.aws_iam_role.lab.arn
+  node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = each.value.subnet_type == "public" ? var.public_subnet_ids : var.private_subnet_ids
 
   instance_types = each.value.instance_types

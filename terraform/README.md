@@ -64,11 +64,11 @@ O `backend.tf` usa `use_lockfile = true`: o lock do estado é feito pelo própri
 Os nomes reproduzem os da Fase 2 (`parte2 - kubernets/fase-c-eks.md`), então os manifestos
 de `manifests-eks/` continuam válidos.
 
-## AWS Academy (LabRole)
+## IAM Roles Automáticas
 
-O ambiente do Academy não permite criar IAM roles. O módulo `eks` faz `data "aws_iam_role"`
-da role existente (`lab_role_name`, padrão `LabRole`) e a associa tanto ao control plane
-quanto aos node groups.
+O Terraform cria automaticamente as IAM roles necessárias para o EKS:
+- Role do cluster (com políticas AmazonEKSClusterPolicy e AmazonEKSVPCResourceController)
+- Role dos node groups (com políticas AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy e AmazonEC2ContainerRegistryReadOnly)
 
 ## Acesso ao cluster
 

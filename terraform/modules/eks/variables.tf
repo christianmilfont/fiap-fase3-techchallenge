@@ -24,12 +24,6 @@ variable "public_subnet_ids" {
   type        = list(string)
 }
 
-variable "lab_role_name" {
-  description = "Role pré-existente usada pelo control plane e pelos node groups (AWS Academy: LabRole)."
-  type        = string
-  default     = "LabRole"
-}
-
 variable "enable_oidc_provider" {
   description = "Cria o IAM OIDC provider do cluster (necessário para IRSA)."
   type        = bool

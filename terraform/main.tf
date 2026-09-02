@@ -26,7 +26,6 @@ module "eks" {
 
   cluster_name         = local.name
   kubernetes_version   = var.kubernetes_version
-  lab_role_name        = var.lab_role_name
   enable_oidc_provider = var.enable_oidc_provider
   vpc_id               = module.networking.vpc_id
   private_subnet_ids   = module.networking.private_subnet_ids

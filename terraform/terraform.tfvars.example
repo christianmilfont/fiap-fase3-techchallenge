@@ -8,7 +8,6 @@ public_subnet_cidrs  = ["10.0.0.0/20", "10.0.16.0/20"]
 private_subnet_cidrs = ["10.0.128.0/20", "10.0.144.0/20"]
 
 kubernetes_version = "1.30"
-lab_role_name      = "LabRole"
 
 node_groups = {
   standard-workers = {
