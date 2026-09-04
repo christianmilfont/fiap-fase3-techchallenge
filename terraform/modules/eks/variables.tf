@@ -36,6 +36,18 @@ variable "enable_irsa_pod_role" {
   default     = true
 }
 
+variable "enable_trust_conditions" {
+  description = "Habilita trust conditions restritas nas IAM roles (requer STS GetCallerIdentity). Desabilite para floci ou testes locais."
+  type        = bool
+  default     = true
+}
+
+variable "account_id" {
+  description = "AWS Account ID para trust conditions. Se não fornecido e enable_trust_conditions = true, será obtido via STS."
+  type        = string
+  default     = null
+}
+
 variable "endpoint_private_access" {
   description = "Habilita o endpoint privado da API do cluster."
   type        = bool

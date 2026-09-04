@@ -1,3 +1,16 @@
+# Data source para obter account ID (só criado se não fornecido manualmente)
+data "aws_caller_identity" "current" {
+  count = var.enable_trust_conditions && var.account_id == null ? 1 : 0
+}
+
+# Local para determinar o account ID a usar
+locals {
+  # Se enable_trust_conditions = false, não usa account ID
+  # Se account_id fornecido, usa o valor fornecido
+  # Se enable_trust_conditions = true e account_id não fornecido, usa data source
+  trust_account_id = var.enable_trust_conditions ? (var.account_id != null ? var.account_id : data.aws_caller_identity.current[0].account_id) : null
+}
+
 # IAM Role para o cluster EKS com trust conditions
 resource "aws_iam_role" "cluster" {
   name = "${var.cluster_name}-cluster-role"
@@ -11,19 +24,19 @@ resource "aws_iam_role" "cluster" {
         Principal = {
           Service = "eks.amazonaws.com"
         }
-        Condition = {
+        # Condição condicional: apenas adicionar trust condition se enable_trust_conditions = true
+        # Isso permite testar com floci (que não suporta STS GetCallerIdentity)
+        Condition = var.enable_trust_conditions ? {
           StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+            "aws:SourceAccount" = local.trust_account_id
           }
-        }
+        } : null
       }
     ]
   })
 
   tags = merge(var.tags, { Name = "${var.cluster_name}-cluster-role" })
 }
-
-data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role_policy_attachment" "clusterAmazonEKSClusterPolicy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
@@ -48,11 +61,12 @@ resource "aws_iam_role" "nodes" {
         Principal = {
           Service = "ec2.amazonaws.com"
         }
-        Condition = {
+        # Condição condicional: apenas adicionar trust condition se enable_trust_conditions = true
+        Condition = var.enable_trust_conditions ? {
           StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+            "aws:SourceAccount" = local.trust_account_id
           }
-        }
+        } : null
       }
     ]
   })
@@ -62,7 +76,7 @@ resource "aws_iam_role" "nodes" {
 
 # IRSA - IAM Role para pods (service accounts)
 resource "aws_iam_role" "pod_role" {
-  count = var.enable_irsa_pod_role ? 1 : 0
+  count = var.enable_irsa_pod_role && var.enable_trust_conditions ? 1 : 0
 
   name = "${var.cluster_name}-pod-role"
 
@@ -105,11 +119,11 @@ resource "aws_iam_role_policy" "pod_policy" {
           "s3:ListBucket"
         ]
         Resource = "*"
-        Condition = {
+        Condition = var.enable_trust_conditions ? {
           StringEquals = {
-            "aws:ResourceAccount": data.aws_caller_identity.current.account_id
+            "aws:ResourceAccount": local.trust_account_id
           }
-        }
+        } : null
       }
     ]
   })

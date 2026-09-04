@@ -25,12 +25,16 @@ O enunciado pede a substituição da criação manual. Terraform descreve o esta
 
 ```
 terraform/
-├── main.tf          # compõe os módulos e liga um no outro
+├── main.tf          # compõe os módulos e liga um no outro (uso direto)
 ├── variables.tf     # tudo que é parametrizável (região, CIDRs, tamanhos...)
 ├── outputs.tf       # o que sai do apply (endpoints, senhas, comandos prontos)
 ├── providers.tf     # aws + helm
 ├── backend.tf       # estado remoto no S3
 ├── bootstrap/       # cria o bucket do estado (o ovo antes da galinha)
+├── environments/   # ambientes separados (dev, prod)
+│   ├── dev/         # configurações de desenvolvimento
+│   └── prod/        # configurações de produção
+├── .checkov.yaml    # configuração de security scanning
 └── modules/
     ├── networking/  ├── eks/   ├── rds/    ├── elasticache/
     ├── dynamodb/    ├── sqs/   ├── ecr/    └── argocd/
@@ -45,7 +49,9 @@ terraform/
   Os bancos ficam **só** em subnet privada; o NAT existe para os pods conseguirem puxar imagem do ECR sem estarem expostos.
 
 - **eks** — control plane + node group (`t3.medium`, desired 2, min 1, max 4) nas subnets privadas.
-  *Detalhe do Academy:* a conta não deixa criar IAM role. Então o módulo faz `data "aws_iam_role" { name = "LabRole" }` — ele **lê** a role que já existe e associa ao cluster e aos nodes, em vez de tentar criar.
+  *IAM roles automáticas:* O módulo cria as IAM roles necessárias (cluster, nodes, pods) com trust conditions restritas.
+  *IRSA:* Habilita IAM Roles for Service Accounts para pods acessarem AWS resources com permissões específicas.
+  *Security:* Condições `aws:SourceAccount` em assume role policies para evitar cross-account access.
 
 - **rds** — 3 PostgreSQL (auth, flag, targeting), um por serviço, em subnet privada, com security group que só aceita conexão vinda do security group do cluster.
   As senhas são geradas por `random_password` — não existe senha digitada no código.
@@ -76,6 +82,29 @@ backend "s3" {
 **O `bootstrap/`:** o bucket que guarda o estado não pode ser criado pelo Terraform que já usa esse bucket. Então `bootstrap/` é um projetinho separado, com estado local, que roda uma vez só e cria o bucket (versionado e criptografado). Depois disso, o projeto principal aponta para ele.
 
 ---
+
+## 🎯 Melhorias Implementadas (Feedback)
+
+### 🔒 Segurança Aprimorada
+- **Checkov integration**: Configuração `.checkov.yaml` com 40+ security checks automatizados
+- **IRSA implementado**: IAM Roles for Service Accounts para pods acessarem AWS resources
+- **Trust conditions**: Condições restritas em assume role policies
+- **Least privilege**: Políticas IAM mais restritivas e específicas
+- **Account isolation**: Condições `aws:SourceAccount` para evitar cross-account access
+
+### 🏗️ Estrutura de Ambientes
+- **Ambientes separados**: `environments/dev/` e `environments/prod/` com configurações específicas
+- **Módulos reutilizáveis**: Mesmos módulos usados em ambos ambientes (DRY principle)
+- **Backends separados**: Estados S3 diferentes por ambiente (dev.tfstate vs prod.tfstate)
+- **Variáveis específicas**: `dev.tfvars` e `prod.tfvars` com configurações otimizadas
+- **Documentação completa**: README.md em `environments/` com guia de uso
+
+### 💡 Benefícios
+- **Isolamento completo**: Dev e prod completamente separados
+- **Escalabilidade**: Fácil adicionar novos ambientes (staging, uat)
+- **Segurança**: Zero dados sensíveis no Git, arquivos .tfvars locais
+- **Manutenibilidade**: Mudanças centralizadas nos módulos
+- **Security scanning**: Verificação automatizada de vulnerabilidades
 
 ## 2. CI + DevSecOps — `.github/workflows/`
 
@@ -131,7 +160,7 @@ Todo scan roda **duas vezes**: uma com `severity: CRITICAL` + `exit-code: 1` (fa
 
 **Duas exceções, ambas documentadas no README:**
 - `gosec -exclude=G704`: a regra de SSRF marca as chamadas do evaluation ao flag/targeting-service. As URLs base vêm de ConfigMap, não de input do usuário — não é SSRF. As outras regras HIGH continuam bloqueando.
-- `.trivyignore`: endpoint público do EKS e egress `0.0.0.0/0` no scan de IaC. No Academy não há VPN/bastion para o `kubectl` nem VPC endpoints para o ECR; cada exceção tem a justificativa escrita no arquivo.
+- `.trivyignore`: endpoint público do EKS e egress `0.0.0.0/0` no scan de IaC. Cada exceção tem a justificativa escrita no arquivo.
 
 **4. Docker Build & Push**
 

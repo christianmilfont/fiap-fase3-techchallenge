@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Config
+clusters:
+- name: floci-token-webhook
+  cluster:
+    server: http://172.18.0.2:4566/_floci/eks/token-webhook
+users:
+- name: floci-token-webhook
+contexts:
+- name: floci-token-webhook
+  context:
+    cluster: floci-token-webhook
+    user: floci-token-webhook
+current-context: floci-token-webhook

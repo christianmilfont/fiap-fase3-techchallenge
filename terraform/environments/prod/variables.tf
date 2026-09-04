@@ -55,6 +55,18 @@ variable "enable_oidc_provider" {
   default     = true
 }
 
+variable "enable_trust_conditions" {
+  description = "Habilita trust conditions restritas nas IAM roles (requer STS GetCallerIdentity). Desabilite para floci ou testes locais."
+  type        = bool
+  default     = true
+}
+
+variable "enable_irsa_pod_role" {
+  description = "Cria IAM role para pods usar IRSA (IAM Roles for Service Accounts)."
+  type        = bool
+  default     = true
+}
+
 variable "node_groups" {
   description = "Node groups do cluster EKS."
   type = map(object({
@@ -191,4 +203,10 @@ variable "tags" {
   description = "Tags adicionais aplicadas a todos os recursos."
   type        = map(string)
   default     = {}
+}
+
+variable "enable_eks" {
+  description = "Habilita criação do cluster EKS. Desabilite para testes com emuladores que não suportam EKS."
+  type        = bool
+  default     = true
 }

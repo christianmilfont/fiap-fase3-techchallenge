@@ -1,3 +1,15 @@
+terraform {
+  required_version = ">= 1.11.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.60"
+    }
+  }
+  
+  backend "local" {}
+}
 # Ambiente de Desenvolvimento
 # Invoca os módulos principais com configurações otimizadas para dev
 
@@ -25,16 +37,19 @@ module "networking" {
 }
 
 module "eks" {
+  count  = var.enable_eks != false ? 1 : 0
   source = "../../modules/eks"
 
-  cluster_name         = local.name
-  kubernetes_version   = var.kubernetes_version
-  enable_oidc_provider = var.enable_oidc_provider
-  vpc_id               = module.networking.vpc_id
-  private_subnet_ids   = module.networking.private_subnet_ids
-  public_subnet_ids    = module.networking.public_subnet_ids
-  node_groups          = var.node_groups
-  tags                 = local.tags
+  cluster_name            = local.name
+  kubernetes_version      = var.kubernetes_version
+  enable_oidc_provider    = var.enable_oidc_provider
+  enable_trust_conditions = var.enable_trust_conditions
+  enable_irsa_pod_role    = var.enable_irsa_pod_role
+  vpc_id                  = module.networking.vpc_id
+  private_subnet_ids      = module.networking.private_subnet_ids
+  public_subnet_ids       = module.networking.public_subnet_ids
+  node_groups             = var.node_groups
+  tags                    = local.tags
 }
 
 module "rds" {
@@ -48,7 +63,7 @@ module "rds" {
   engine_version = var.rds_engine_version
 
   allowed_cidr_blocks        = [module.networking.vpc_cidr]
-  allowed_security_group_ids = [module.eks.cluster_security_group_id]
+  allowed_security_group_ids = var.enable_eks ? [module.eks[0].cluster_security_group_id] : []
 
   tags = local.tags
 }
@@ -64,7 +79,7 @@ module "elasticache" {
   engine_version     = var.redis_engine_version
 
   allowed_cidr_blocks        = [module.networking.vpc_cidr]
-  allowed_security_group_ids = [module.eks.cluster_security_group_id]
+  allowed_security_group_ids = var.enable_eks ? [module.eks[0].cluster_security_group_id] : []
 
   tags = local.tags
 }
@@ -99,12 +114,10 @@ module "ecr" {
 
 module "argocd" {
   source = "../../modules/argocd"
-  count  = var.enable_argocd ? 1 : 0
+  count  = var.enable_argocd && var.enable_eks != false ? 1 : 0
 
   chart_version       = var.argocd_chart_version
   server_service_type = var.argocd_server_service_type
   gitops_repo_url     = var.gitops_repo_url
   gitops_revision     = var.gitops_revision
-
-  depends_on = [module.eks]
 }
