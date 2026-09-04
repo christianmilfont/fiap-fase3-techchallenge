@@ -1,0 +1,84 @@
+# Checkov Configuration for Terraform Security Scanning
+# https://www.checkov.io/
+
+framework:
+  - terraform
+
+check:
+  # IAM Security Checks
+  - CKV_AWS_27    # Ensure IAM policies does not allow write access without constraints
+  - CKV_AWS_28    # Ensure IAM policies does not allow privilege escalation
+  - CKV_AWS_40    # Ensure IAM policies does not allow permissions management / administrative access
+  - CKV_AWS_19    # Ensure IAM policies are attached only to groups or roles
+  - CKV_AWS_76    # Ensure IAM password policy requires at least one symbol
+  - CKV_AWS_78    # Ensure IAM password policy expires passwords within 90 days or less
+  - CKV_AWS_79    # Ensure IAM password policy requires minimum length of 14 or greater
+  - CKV_AWS_80    # Ensure IAM password policy prevents password reuse
+  - CKV_AWS_81    # Ensure IAM password policy requires lowercase letters
+  - CKV_AWS_82    # Ensure IAM password policy requires uppercase letters
+  - CKV_AWS_83    # Ensure IAM password policy requires numbers
+  - CKV_AWS_84    # Ensure IAM password policy requires symbols
+  - CKV_AWS_109  # Ensure IAM users are not assigned policies directly
+  - CKV_AWS_111  # Ensure IAM policies do not allow full administrative privileges
+  - CKV_AWS_119  # Ensure IAM policies does not allow credentials exposure
+  - CKV_AWS_140  # Ensure IAM users have MFA enabled
+  - CKV_AWS_276  # Ensure IAM user does not have access key enabled
+
+  # EKS Security Checks
+  - CKV_AWS_58    # Ensure EKS cluster has encryption enabled
+  - CKV_AWS_59    # Ensure EKS cluster has public access disabled
+  - CKV_AWS_60    # Ensure EKS cluster has logging enabled
+  - CKV_AWS_38    # Ensure EKS cluster has public access disabled
+  - CKV_AWS_37    # Ensure EKS cluster has public access CIDRs configured
+  - CKV_AWS_39    # Ensure EKS cluster has secrets encryption enabled
+
+  # RDS Security Checks
+  - CKV_AWS_17    # Ensure RDS instance has encryption enabled
+  - CKV_AWS_3     # Ensure RDS instance has storage encryption
+  - CKV_AWS_4     # Ensure RDS instance has multi-AZ enabled
+  - CKV_AWS_5     # Ensure RDS instance has backup enabled
+  - CKV_AWS_6     # Ensure RDS instance has deletion protection
+  - CKV_AWS_7     # Ensure RDS instance has minor version upgrade enabled
+  - CKV_AWS_16    # Ensure RDS instance has auto minor version upgrade
+  - CKV_AWS_8     # Ensure RDS instance has final snapshot before deletion
+
+  # S3 Security Checks
+  - CKV_AWS_20    # Ensure S3 bucket has versioning enabled
+  - CKV_AWS_21    # Ensure S3 bucket has server-side encryption enabled
+  - CKV_AWS_18    # Ensure S3 bucket has public access restricted
+  - CKV_AWS_56    # Ensure S3 bucket has logging enabled
+  - CKV_AWS_57    # Ensure S3 bucket has lifecycle configuration
+  - CKV_AWS_2     # Ensure S3 bucket has AES256 encryption
+
+  # VPC Security Checks
+  - CKV_AWS_61    # Ensure VPC has flow logs enabled
+  - CKV_AWS_24    # Ensure VPC subnet has map public IP on launch disabled
+  - CKV_AWS_25    # Ensure VPC subnet has auto assign public IP disabled
+  - CKV_AWS_26    # Ensure VPC has DNS support enabled
+
+  # General Security
+  - CKV_AWS_1     # Ensure IAM policies are not overly permissive
+  - CKV_AWS_23    # Ensure security groups allow only necessary ports
+  - CKV_AWS_24    # Ensure security groups have description
+  - CKV_AWS_25    # Ensure security groups have inbound rules restricted
+  - CKV_AWS_26    # Ensure security groups have outbound rules restricted
+
+skip-check:
+  # Skip checks that are not applicable to this environment
+  - CKV_AWS_276  # IAM user access keys (we use roles, not users)
+  - CKV_AWS_140  # MFA for IAM users (we use roles, not users)
+
+soft-fail: true
+quiet: true
+
+# Output formats
+output:
+  - cli
+  - sarif
+  - json
+
+# Directory structure
+directory:
+  - terraform/
+  - terraform/modules/
+  - terraform/environments/

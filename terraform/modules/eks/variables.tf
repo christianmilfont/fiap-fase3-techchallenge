@@ -30,6 +30,12 @@ variable "enable_oidc_provider" {
   default     = true
 }
 
+variable "enable_irsa_pod_role" {
+  description = "Cria IAM role para pods usar IRSA (IAM Roles for Service Accounts)."
+  type        = bool
+  default     = true
+}
+
 variable "endpoint_private_access" {
   description = "Habilita o endpoint privado da API do cluster."
   type        = bool

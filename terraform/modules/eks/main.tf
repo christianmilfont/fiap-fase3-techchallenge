@@ -1,4 +1,4 @@
-# IAM Role para o cluster EKS
+# IAM Role para o cluster EKS com trust conditions
 resource "aws_iam_role" "cluster" {
   name = "${var.cluster_name}-cluster-role"
 
@@ -11,12 +11,19 @@ resource "aws_iam_role" "cluster" {
         Principal = {
           Service = "eks.amazonaws.com"
         }
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       }
     ]
   })
 
   tags = merge(var.tags, { Name = "${var.cluster_name}-cluster-role" })
 }
+
+data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role_policy_attachment" "clusterAmazonEKSClusterPolicy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
@@ -28,7 +35,7 @@ resource "aws_iam_role_policy_attachment" "clusterAmazonEKSVPCResourceController
   role       = aws_iam_role.cluster.name
 }
 
-# IAM Role para os node groups
+# IAM Role para os node groups com trust conditions
 resource "aws_iam_role" "nodes" {
   name = "${var.cluster_name}-nodes-role"
 
@@ -41,11 +48,71 @@ resource "aws_iam_role" "nodes" {
         Principal = {
           Service = "ec2.amazonaws.com"
         }
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       }
     ]
   })
 
   tags = merge(var.tags, { Name = "${var.cluster_name}-nodes-role" })
+}
+
+# IRSA - IAM Role para pods (service accounts)
+resource "aws_iam_role" "pod_role" {
+  count = var.enable_irsa_pod_role ? 1 : 0
+
+  name = "${var.cluster_name}-pod-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.this[0].arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:sub" = "system:serviceaccount:togglemaster:*"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-pod-role" })
+}
+
+# IRSA - Política básica para pods (pode ser estendida por serviço)
+resource "aws_iam_role_policy" "pod_policy" {
+  count = var.enable_irsa_pod_role ? 1 : 0
+
+  name = "${var.cluster_name}-pod-policy"
+  role = aws_iam_role.pod_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceAccount": data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "nodesAmazonEKSWorkerNodePolicy" {
