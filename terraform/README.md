@@ -24,8 +24,7 @@ terraform/
 │   ├── elasticache/      # cluster Redis (replication group)
 │   ├── dynamodb/         # tabela ToggleMasterAnalytics
 │   ├── sqs/              # fila principal + DLQ
-│   ├── ecr/              # repositórios de imagens
-│   └── argocd/           # Helm chart do ArgoCD
+│   └── ecr/              # repositórios de imagens
 ├── backend.tf            # backend S3 com use_lockfile
 ├── main.tf               # composição dos módulos (uso direto, sem separação de ambientes)
 ├── variables.tf / outputs.tf
@@ -151,24 +150,6 @@ São geradas por `random_password` e ficam no estado (por isso o bucket é cript
 ```bash
 terraform output -json rds_passwords
 ```
-
-## ArgoCD
-
-O módulo `argocd` instala o chart oficial no cluster via provider `helm`, que se
-autentica com `aws eks get-token` (o token é gerado no apply, não fica no estado).
-
-```bash
-terraform apply                                        # instala o ArgoCD junto da infra
-terraform output -raw argocd_admin_password_command | bash   # senha inicial do admin
-terraform output -raw argocd_server_url_command | bash       # DNS do LoadBalancer da UI
-```
-
-Como o provider precisa falar com a API do EKS, o primeiro `apply` em uma conta
-vazia pode falhar ao criar o `helm_release` antes de o endpoint responder. Nesse
-caso rode com `-var enable_argocd=false` e depois um segundo apply sem a flag.
-
-Depois disso, `kubectl apply -f gitops/argocd/root-app.yaml` registra as 5
-Applications (veja `gitops/README.md`).
 
 ## 🔒 Segurança - Arquivos Locais
 

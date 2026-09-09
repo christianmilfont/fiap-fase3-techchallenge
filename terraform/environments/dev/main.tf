@@ -1,13 +1,13 @@
 terraform {
   required_version = ">= 1.11.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = ">= 5.60"
     }
   }
-  
+
   backend "local" {}
 }
 # Ambiente de Desenvolvimento
@@ -110,14 +110,4 @@ module "ecr" {
 
   repository_names = var.ecr_repository_names
   tags             = local.tags
-}
-
-module "argocd" {
-  source = "../../modules/argocd"
-  count  = var.enable_argocd && var.enable_eks != false ? 1 : 0
-
-  chart_version       = var.argocd_chart_version
-  server_service_type = var.argocd_server_service_type
-  gitops_repo_url     = var.gitops_repo_url
-  gitops_revision     = var.gitops_revision
 }

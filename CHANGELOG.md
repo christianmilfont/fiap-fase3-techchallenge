@@ -2,6 +2,42 @@
 
 All notable changes to the ToggleMaster project will be documented in this file.
 
+## [Fase 3] - 2026-09-09
+
+### 🔧 Separação de Infraestrutura e Deploy
+
+#### Remoção do ArgoCD do Terraform
+- **Infraestrutura pura**: Removido módulo ArgoCD do Terraform para separar responsabilidades
+- **Módulo deletado**: `terraform/modules/argocd/` removido completamente
+- **Variáveis removidas**: `enable_argocd`, `argocd_chart_version`, `argocd_server_service_type`, `gitops_repo_url`, `gitops_revision`
+- **Provider Helm removido**: Eliminado provider Helm de todos os arquivos de configuração
+- **Arquivos atualizados**:
+  - `terraform/main.tf` - removido módulo argocd
+  - `terraform/variables.tf` - removidas variáveis ArgoCD
+  - `terraform/versions.tf` - removido provider Helm
+  - `terraform/providers.tf` - removido provider Helm
+  - `terraform/environments/dev/main.tf` - removido módulo argocd
+  - `terraform/environments/dev/variables.tf` - removidas variáveis ArgoCD
+  - `terraform/environments/dev/versions.tf` - removido provider Helm
+  - `terraform/environments/prod/main.tf` - removido módulo argocd
+  - `terraform/environments/prod/variables.tf` - removidas variáveis ArgoCD
+  - `terraform/environments/prod/versions.tf` - removido provider Helm
+  - `terraform/environments/prod/providers.tf` - removido provider Helm
+  - `terraform/providers_floci.tf` - arquivo deletado (não era mais necessário)
+
+#### Benefícios da Separação
+- **Single Responsibility**: Terraform focado apenas em infraestrutura cloud
+- **Flexibilidade de deploy**: ArgoCD pode ser instalado/gerenciado separadamente
+- **CI/CD independente**: Esteiras de integração e deploy não dependentes do Terraform
+- **Manutenibilidade**: Menos complexidade no código Terraform
+- **Segurança**: Menos privilégios necessários no Terraform (sem acesso ao cluster Kubernetes)
+
+#### Documentação Atualizada
+- **terraform/README.md**: Removida seção sobre ArgoCD e provider Helm
+- **gitops/README.md**: Atualizada ordem de execução para refletir instalação separada do ArgoCD
+
+---
+
 ## [Fase 3] - 2026-09-04
 
 ### 🚀 Infrastructure as Code (Terraform)

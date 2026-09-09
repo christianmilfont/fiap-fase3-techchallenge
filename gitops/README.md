@@ -33,11 +33,12 @@ serviços terminam o pipeline ao mesmo tempo.
 
 ## Ordem de execução
 
-1. `terraform apply` (cria EKS, RDS, Redis, SQS, ECR e instala o ArgoCD).
-2. `./gitops/scripts/preencher-placeholders.sh` — troca `<ACCOUNT_ID>` e o
+1. `terraform apply` (cria EKS, RDS, Redis, SQS, ECR).
+2. Instalar ArgoCD separadamente via Helm ou outro método de deploy.
+3. `./gitops/scripts/preencher-placeholders.sh` — troca `<ACCOUNT_ID>` e o
    endpoint do Redis pelos valores reais e commita.
-3. `./gitops/scripts/criar-secrets.sh` — cria os Secrets no cluster.
-4. `kubectl apply -f gitops/argocd/root-app.yaml` — a partir daqui o ArgoCD
+4. `./gitops/scripts/criar-secrets.sh` — cria os Secrets no cluster.
+5. `kubectl apply -f gitops/argocd/root-app.yaml` — a partir daí o ArgoCD
    assume as 5 Applications.
 
 ## Secrets
