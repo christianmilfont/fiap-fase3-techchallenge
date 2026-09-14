@@ -4,9 +4,9 @@ variable "repository_names" {
 }
 
 variable "image_tag_mutability" {
-  description = "MUTABLE ou IMMUTABLE."
+  description = "MUTABLE ou IMMUTABLE. IMMUTABLE é recomendado para GitOps pois garante que tags não podem ser sobrescritas."
   type        = string
-  default     = "MUTABLE"
+  default     = "IMMUTABLE"
 }
 
 variable "scan_on_push" {
@@ -22,9 +22,9 @@ variable "force_delete" {
 }
 
 variable "max_image_count" {
-  description = "Quantidade de imagens mantidas pela lifecycle policy (0 desabilita)."
+  description = "Quantidade de imagens mantidas pela lifecycle policy (0 desabilita). Recomendado: 20 para GitOps."
   type        = number
-  default     = 10
+  default     = 20
 }
 
 variable "tags" {
