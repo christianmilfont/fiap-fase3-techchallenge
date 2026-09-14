@@ -76,7 +76,7 @@ resource "aws_iam_role" "nodes" {
 
 # IRSA - IAM Role para pods (service accounts)
 resource "aws_iam_role" "pod_role" {
-  count = var.enable_irsa_pod_role && var.enable_trust_conditions ? 1 : 0
+  count = var.enable_irsa_pod_role && var.enable_trust_conditions && !var.enable_service_irsa_roles ? 1 : 0
 
   name = "${var.cluster_name}-pod-role"
 
@@ -103,7 +103,7 @@ resource "aws_iam_role" "pod_role" {
 
 # IRSA - Política básica para pods (pode ser estendida por serviço)
 resource "aws_iam_role_policy" "pod_policy" {
-  count = var.enable_irsa_pod_role ? 1 : 0
+  count = var.enable_irsa_pod_role && !var.enable_service_irsa_roles ? 1 : 0
 
   name = "${var.cluster_name}-pod-policy"
   role = aws_iam_role.pod_role[0].id
@@ -121,9 +121,163 @@ resource "aws_iam_role_policy" "pod_policy" {
         Resource = "*"
         Condition = var.enable_trust_conditions ? {
           StringEquals = {
-            "aws:ResourceAccount": local.trust_account_id
+            "aws:ResourceAccount" : local.trust_account_id
           }
         } : null
+      }
+    ]
+  })
+}
+
+# IRSA - Service-specific roles
+# Analytics service role (SQS + DynamoDB)
+resource "aws_iam_role" "analytics_service" {
+  count = var.enable_service_irsa_roles && var.enable_trust_conditions ? 1 : 0
+
+  name = "${var.cluster_name}-analytics-service"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.this[0].arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:sub" = "system:serviceaccount:analytics-service:analytics-service-sa"
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-analytics-service-role" })
+}
+
+resource "aws_iam_role_policy" "analytics_service" {
+  count = var.enable_service_irsa_roles ? 1 : 0
+
+  name = "${var.cluster_name}-analytics-service-policy"
+  role = aws_iam_role.analytics_service[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = var.sqs_queue_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem"
+        ]
+        Resource = var.dynamodb_table_arn
+      }
+    ]
+  })
+}
+
+# Evaluation service role (SQS)
+resource "aws_iam_role" "evaluation_service" {
+  count = var.enable_service_irsa_roles && var.enable_trust_conditions ? 1 : 0
+
+  name = "${var.cluster_name}-evaluation-service"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.this[0].arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:sub" = "system:serviceaccount:evaluation-service:evaluation-service-sa"
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-evaluation-service-role" })
+}
+
+resource "aws_iam_role_policy" "evaluation_service" {
+  count = var.enable_service_irsa_roles ? 1 : 0
+
+  name = "${var.cluster_name}-evaluation-service-policy"
+  role = aws_iam_role.evaluation_service[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = var.sqs_queue_arn
+      }
+    ]
+  })
+}
+
+# KEDA operator role (SQS)
+resource "aws_iam_role" "keda_operator" {
+  count = var.enable_service_irsa_roles && var.enable_trust_conditions ? 1 : 0
+
+  name = "${var.cluster_name}-keda-operator"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.this[0].arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:sub" = "system:serviceaccount:keda:keda-operator"
+            "${replace(aws_iam_openid_connect_provider.this[0].url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-keda-operator-role" })
+}
+
+resource "aws_iam_role_policy" "keda_operator" {
+  count = var.enable_service_irsa_roles ? 1 : 0
+
+  name = "${var.cluster_name}-keda-operator-policy"
+  role = aws_iam_role.keda_operator[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = var.sqs_queue_arn
       }
     ]
   })

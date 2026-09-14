@@ -76,6 +76,12 @@ variable "enable_irsa_pod_role" {
   default     = true
 }
 
+variable "enable_service_irsa_roles" {
+  description = "Habilita criação de roles IRSA específicas por serviço (analytics, evaluation, keda)."
+  type        = bool
+  default     = true
+}
+
 variable "node_groups" {
   description = "Node groups do cluster EKS."
   type = map(object({

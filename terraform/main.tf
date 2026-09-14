@@ -24,16 +24,19 @@ module "networking" {
 module "eks" {
   source = "./modules/eks"
 
-  cluster_name            = local.name
-  kubernetes_version      = var.kubernetes_version
-  enable_oidc_provider    = var.enable_oidc_provider
-  enable_trust_conditions = var.enable_trust_conditions
-  enable_irsa_pod_role    = var.enable_irsa_pod_role
-  vpc_id                  = module.networking.vpc_id
-  private_subnet_ids      = module.networking.private_subnet_ids
-  public_subnet_ids       = module.networking.public_subnet_ids
-  node_groups             = var.node_groups
-  tags                    = local.tags
+  cluster_name             = local.name
+  kubernetes_version       = var.kubernetes_version
+  enable_oidc_provider     = var.enable_oidc_provider
+  enable_trust_conditions  = var.enable_trust_conditions
+  enable_irsa_pod_role     = var.enable_irsa_pod_role
+  enable_service_irsa_roles = var.enable_service_irsa_roles
+  vpc_id                   = module.networking.vpc_id
+  private_subnet_ids       = module.networking.private_subnet_ids
+  public_subnet_ids        = module.networking.public_subnet_ids
+  node_groups              = var.node_groups
+  sqs_queue_arn           = module.sqs.queue_arn
+  dynamodb_table_arn       = module.dynamodb.table_arn
+  tags                     = local.tags
 }
 
 module "rds" {

@@ -99,3 +99,22 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# Variables for service-specific IRSA roles
+variable "enable_service_irsa_roles" {
+  description = "Habilita criação de roles IRSA específicas por serviço."
+  type        = bool
+  default     = true
+}
+
+variable "sqs_queue_arn" {
+  description = "ARN da fila SQS para permissions das roles."
+  type        = string
+  default     = ""
+}
+
+variable "dynamodb_table_arn" {
+  description = "ARN da tabela DynamoDB para permissions da role analytics."
+  type        = string
+  default     = ""
+}

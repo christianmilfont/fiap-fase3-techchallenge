@@ -107,3 +107,18 @@ output "app_secret_arns" {
   description = "ARNs dos secrets do AWS Secrets Manager (map: serviço => arn)."
   value       = module.secrets_manager.app_secret_arns
 }
+
+output "analytics_role_arn" {
+  description = "ARN da IAM role para analytics-service (IRSA)."
+  value       = module.eks.analytics_role_arn
+}
+
+output "evaluation_role_arn" {
+  description = "ARN da IAM role para evaluation-service (IRSA)."
+  value       = module.eks.evaluation_role_arn
+}
+
+output "keda_role_arn" {
+  description = "ARN da IAM role para keda-operator (IRSA)."
+  value       = module.eks.keda_role_arn
+}
