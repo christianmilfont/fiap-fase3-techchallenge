@@ -1,14 +1,5 @@
 terraform {
   required_version = ">= 1.11.0"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.60"
-    }
-  }
-
-  backend "local" {}
 }
 # Ambiente de Desenvolvimento
 # Invoca os módulos principais com configurações otimizadas para dev
@@ -40,16 +31,19 @@ module "eks" {
   count  = var.enable_eks != false ? 1 : 0
   source = "../../modules/eks"
 
-  cluster_name            = local.name
-  kubernetes_version      = var.kubernetes_version
-  enable_oidc_provider    = var.enable_oidc_provider
-  enable_trust_conditions = var.enable_trust_conditions
-  enable_irsa_pod_role    = var.enable_irsa_pod_role
-  vpc_id                  = module.networking.vpc_id
-  private_subnet_ids      = module.networking.private_subnet_ids
-  public_subnet_ids       = module.networking.public_subnet_ids
-  node_groups             = var.node_groups
-  tags                    = local.tags
+  cluster_name              = local.name
+  kubernetes_version        = var.kubernetes_version
+  enable_oidc_provider      = var.enable_oidc_provider
+  enable_trust_conditions   = var.enable_trust_conditions
+  enable_irsa_pod_role      = var.enable_irsa_pod_role
+  enable_service_irsa_roles = var.enable_service_irsa_roles
+  vpc_id                    = module.networking.vpc_id
+  private_subnet_ids        = module.networking.private_subnet_ids
+  public_subnet_ids         = module.networking.public_subnet_ids
+  node_groups               = var.node_groups
+  sqs_queue_arn             = module.sqs.queue_arn
+  dynamodb_table_arn        = module.dynamodb.table_arn
+  tags                      = local.tags
 }
 
 module "rds" {
@@ -110,4 +104,36 @@ module "ecr" {
 
   repository_names = var.ecr_repository_names
   tags             = local.tags
+}
+
+module "github_oidc" {
+  source = "../../modules/github-oidc"
+
+  project_name        = local.name
+  github_repositories = var.github_repositories
+  ecr_repository_arns = module.ecr.repository_arns
+  tags                = local.tags
+}
+
+module "external_secrets" {
+  source = "../../modules/external-secrets"
+
+  project_name            = local.name
+  eks_oidc_provider_url   = var.enable_eks ? module.eks[0].oidc_issuer_url : ""
+  service_account_subject = var.eso_service_account_subject
+  secret_arns             = module.secrets_manager.app_secret_arns
+  tags                    = local.tags
+}
+
+module "secrets_manager" {
+  source = "../../modules/secrets-manager"
+
+  project_name            = local.name
+  secret_prefix           = var.secret_prefix
+  recovery_window_in_days = var.recovery_window_in_days
+  auth_database_url       = "postgres://${module.rds.usernames["auth-db"]}:${urlencode(module.rds.passwords["auth-db"])}@${module.rds.addresses["auth-db"]}:5432/${module.rds.db_names["auth-db"]}"
+  flag_database_url       = "postgres://${module.rds.usernames["flag-db"]}:${urlencode(module.rds.passwords["flag-db"])}@${module.rds.addresses["flag-db"]}:5432/${module.rds.db_names["flag-db"]}"
+  targeting_database_url  = "postgres://${module.rds.usernames["targeting-db"]}:${urlencode(module.rds.passwords["targeting-db"])}@${module.rds.addresses["targeting-db"]}:5432/${module.rds.db_names["targeting-db"]}"
+  redis_url               = "redis://${module.elasticache.primary_endpoint_address}:${module.elasticache.port}"
+  tags                    = local.tags
 }

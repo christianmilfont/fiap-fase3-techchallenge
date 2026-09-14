@@ -180,3 +180,39 @@ variable "enable_eks" {
   type        = bool
   default     = true
 }
+
+variable "enable_service_irsa_roles" {
+  description = "Habilita criação de roles IRSA específicas por serviço (analytics, evaluation, keda)."
+  type        = bool
+  default     = true
+}
+
+variable "github_repositories" {
+  description = "Lista de repositórios GitHub que podem assumir a role do GitHub Actions (formato: repo:owner/repo:*)."
+  type        = list(string)
+  default = [
+    "repo:alansenairj/auth-service:*",
+    "repo:alansenairj/evaluation-service:*",
+    "repo:alansenairj/flag-service:*",
+    "repo:alansenairj/targeting-service:*",
+    "repo:alansenairj/analytics-service:*",
+  ]
+}
+
+variable "eso_service_account_subject" {
+  description = "Subject do ServiceAccount do External Secrets Operator (formato: system:serviceaccount:namespace:serviceaccount)."
+  type        = string
+  default     = "system:serviceaccount:external-secrets:external-secrets"
+}
+
+variable "secret_prefix" {
+  description = "Prefixo para os nomes dos secrets no Secrets Manager."
+  type        = string
+  default     = "togglemaster"
+}
+
+variable "recovery_window_in_days" {
+  description = "Dias de recuperação antes de permitir delete imediato (0 permite delete imediato para labs)."
+  type        = number
+  default     = 0
+}
