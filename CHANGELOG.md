@@ -2,6 +2,81 @@
 
 All notable changes to the ToggleMaster project will be documented in this file.
 
+## [Fase 3] - 2026-09-14
+
+### 🔐 CI/CD Integration - GitHub Actions OIDC & Secrets Management
+
+#### GitHub Actions OIDC Provider
+- **Autenticação federada**: Elimina credenciais estáticas (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) no CI/CD
+- **Módulo github-oidc**: Criado módulo dedicado para OIDC provider do GitHub Actions
+- **Trust policy restrita**: Apenas os 5 repositórios de serviço (alansenairj/*) podem assumir a role
+- **Permissões ECR**: Push restrito aos repositórios específicos do projeto
+- **Zero secrets no GitHub**: Credenciais temporárias via OIDC federation
+
+#### External Secrets Operator Integration
+- **Módulo external-secrets**: Criado módulo para role IRSA do External Secrets Operator
+- **Secrets Manager access**: Permite que o ESO leia secrets do AWS Secrets Manager
+- **Service Account**: Trust policy configurada para external-secrets:external-secrets
+- **Permissões específicas**: GetSecretValue e DescribeSecret nos secrets do projeto
+
+#### AWS Secrets Manager Implementation
+- **Módulo secrets-manager**: Criado módulo para gerenciar secrets dos serviços
+- **Secrets centralizados**: DATABASE_URL, MASTER_KEY, SERVICE_API_KEY no AWS Secrets Manager
+- **Geração automática**: MASTER_KEY e SERVICE_API_KEY gerados com random_password
+- **Integração RDS**: Usa outputs do módulo RDS para construir connection strings
+- **Integração ElastiCache**: REDIS_URL para evaluation-service
+- **Zero manual**: Nenhum comando manual necessário para criar secrets
+
+#### IRSA Roles Refactoring
+- **Roles específicas por serviço**: Substituída role genérica S3 por roles dedicadas
+- **Permissões corretas**: SQS (ReceiveMessage, DeleteMessage, GetQueueAttributes) + DynamoDB (PutItem)
+- **Namespaces corretos**: Trust policies com namespaces reais (analytics-service, evaluation-service, keda)
+- **Princípio do menor privilégio**: ARNs específicos em vez de wildcards "*"
+- **Roles criadas**: analytics-service, evaluation-service, keda-operator
+
+#### ECR Immutable Tags
+- **Tags imutáveis**: Configurado image_tag_mutability = IMMUTABLE para GitOps compliance
+- **Auditabilidade**: Garante que Git descreve exatamente o que roda no cluster
+- **Lifecycle policy**: Aumentado retention de 10 para 20 imagens
+- **Security scan**: Mantido scan_on_push = true
+
+#### Backend S3 Consistency
+- **Ambiente dev**: Mudado de backend local para S3 (compliance PDF)
+- **Consistência**: Todos os ambientes (dev, prod) usam backend S3
+- **Lock nativo**: use_lockfile = true em todos os ambientes
+- **Colaboração**: Estado remoto facilita trabalho em equipe
+
+#### Outputs Consolidados
+- **github_actions_role_arn**: ARN da role para GitHub Actions
+- **eso_role_arn**: ARN da role para External Secrets Operator
+- **app_secret_arns**: Map de ARNs dos secrets do Secrets Manager
+- **analytics_role_arn**: ARN da role para analytics-service
+- **evaluation_role_arn**: ARN da role para evaluation-service
+- **keda_role_arn**: ARN da role para keda-operator
+
+#### Documentação
+- **tasks-terraform.md**: Documentação completa de todas as tarefas implementadas
+- **8 issues resolvidas**: Cada issue documentada com problema, solução e validação
+- **Traceabilidade**: Histórico completo das mudanças para integração CI/CD
+
+#### Arquivos Criados
+- `terraform/modules/github-oidc/` - Módulo GitHub Actions OIDC
+- `terraform/modules/external-secrets/` - Módulo External Secrets Operator
+- `terraform/modules/secrets-manager/` - Módulo AWS Secrets Manager
+- `terraform/tasks-terraform.md` - Documentação de tarefas
+- `terraform/environments/dev/backend.tf` - Backend S3 para dev
+
+#### Arquivos Modificados
+- `terraform/main.tf` - Integrados novos módulos
+- `terraform/variables.tf` - Adicionadas variáveis para novos módulos
+- `terraform/outputs.tf` - Adicionados outputs consolidados
+- `terraform/modules/eks/` - Refatoradas roles IRSA por serviço
+- `terraform/modules/ecr/` - Configurado tags imutáveis
+- `terraform/environments/dev/` - Backend S3 e novos módulos
+- `terraform/environments/prod/` - Novos módulos integrados
+
+---
+
 ## [Fase 3] - 2026-09-09
 
 ### 🔧 Separação de Infraestrutura e Deploy

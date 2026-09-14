@@ -9,7 +9,8 @@ Este documento explica o que foi criado, **por quê** e como cada peça funciona
 | --- | --- |
 | Infraestrutura como código | `terraform/` |
 | CI + DevSecOps | `.github/workflows/` |
-| CD com GitOps | `gitops/` + `terraform/modules/argocd` |
+| CD com GitOps | `gitops/` |
+| Documentação de tarefas | `terraform/tasks-terraform.md` |
 
 O fio condutor: na Fase 2 você clicava no console e rodava `kubectl apply` na mão. Agora **nada** é criado à mão — nem a infra (Terraform), nem a imagem (CI), nem o que roda no cluster (ArgoCD).
 
@@ -28,16 +29,18 @@ terraform/
 ├── main.tf          # compõe os módulos e liga um no outro (uso direto)
 ├── variables.tf     # tudo que é parametrizável (região, CIDRs, tamanhos...)
 ├── outputs.tf       # o que sai do apply (endpoints, senhas, comandos prontos)
-├── providers.tf     # aws + helm
+├── providers.tf     # aws + random + tls
 ├── backend.tf       # estado remoto no S3
 ├── bootstrap/       # cria o bucket do estado (o ovo antes da galinha)
 ├── environments/   # ambientes separados (dev, prod)
 │   ├── dev/         # configurações de desenvolvimento
 │   └── prod/        # configurações de produção
 ├── .checkov.yaml    # configuração de security scanning
+├── tasks-terraform.md # documentação completa de tarefas implementadas
 └── modules/
     ├── networking/  ├── eks/   ├── rds/    ├── elasticache/
-    ├── dynamodb/    ├── sqs/   ├── ecr/    └── argocd/
+    ├── dynamodb/    ├── sqs/   ├── ecr/    ├── github-oidc/
+    ├── external-secrets/ └── secrets-manager/
 ```
 
 **Por que módulos:** cada recurso vira uma caixa com entrada (variables) e saída (outputs). O `main.tf` só liga as caixas — por exemplo, o `vpc_id` que sai do `networking` entra no `eks` e no `rds`. Isso é o que garante a ordem de criação: o Terraform monta o grafo de dependências sozinho a partir dessas referências, sem você dizer "cria a VPC primeiro".
@@ -49,8 +52,9 @@ terraform/
   Os bancos ficam **só** em subnet privada; o NAT existe para os pods conseguirem puxar imagem do ECR sem estarem expostos.
 
 - **eks** — control plane + node group (`t3.medium`, desired 2, min 1, max 4) nas subnets privadas.
-  *IAM roles automáticas:* O módulo cria as IAM roles necessárias (cluster, nodes, pods) com trust conditions restritas.
-  *IRSA:* Habilita IAM Roles for Service Accounts para pods acessarem AWS resources com permissões específicas.
+  *IAM roles automáticas:* O módulo cria as IAM roles necessárias (cluster, nodes) com trust conditions restritas.
+  *IRSA específicas por serviço:* Roles IAM dedicadas para analytics-service, evaluation-service, e keda-operator com permissões corretas (SQS/DynamoDB em vez de S3).
+  *Trust conditions:* Namespaces corretos (analytics-service, evaluation-service, keda) em vez de namespace genérico.
   *Security:* Condições `aws:SourceAccount` em assume role policies para evitar cross-account access.
 
 - **rds** — 3 PostgreSQL (auth, flag, targeting), um por serviço, em subnet privada, com security group que só aceita conexão vinda do security group do cluster.
@@ -62,7 +66,22 @@ terraform/
 
 - **sqs** — fila que desacopla o evaluation (produtor de eventos) do analytics (consumidor).
 
-- **ecr** — os 5 repositórios de imagem, com `scan_on_push` ligado.
+- **ecr** — os 5 repositórios de imagem, com `scan_on_push` ligado e tags imutáveis para GitOps compliance.
+
+- **github-oidc** — OIDC provider do GitHub Actions + IAM role para autenticação federada na pipeline CI/CD.
+  *Elimina credenciais estáticas:* GitHub Actions usa tokens temporários via OIDC em vez de AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY.
+  *Trust policy restrita:* Apenas os 5 repositórios de serviço (alansenairj/*) podem assumir a role.
+  *Permissões ECR:* Push restrito aos repositórios específicos do projeto.
+
+- **external-secrets** — IAM role IRSA para External Secrets Operator.
+  *Secrets Management:* Permite que o ESO leia secrets do AWS Secrets Manager via IRSA.
+  *Service Account:* Trust policy configurada para external-secrets:external-secrets.
+  *Permissões:* GetSecretValue e DescribeSecret nos secrets específicos do projeto.
+
+- **secrets-manager** — Secrets no AWS Secrets Manager para as credenciais dos serviços.
+  *Centralização:* DATABASE_URL, MASTER_KEY, SERVICE_API_KEY armazenados de forma segura.
+  *Geração automática:* MASTER_KEY e SERVICE_API_KEY gerados com random_password.
+  *Integração:* Usa outputs do RDS e ElastiCache para construir as connection strings.
 
 ### O estado remoto
 
@@ -87,17 +106,21 @@ backend "s3" {
 
 ### 🔒 Segurança Aprimorada
 - **Checkov integration**: Configuração `.checkov.yaml` com 40+ security checks automatizados
-- **IRSA implementado**: IAM Roles for Service Accounts para pods acessarem AWS resources
+- **GitHub Actions OIDC**: Autenticação federada elimina credenciais estáticas no CI/CD
+- **IRSA específicas por serviço**: Roles dedicadas com permissões corretas (SQS/DynamoDB)
 - **Trust conditions**: Condições restritas em assume role policies
-- **Least privilege**: Políticas IAM mais restritivas e específicas
+- **Least privilege**: Políticas IAM específicas por recurso (sem wildcards "*")
 - **Account isolation**: Condições `aws:SourceAccount` para evitar cross-account access
+- **Secrets Manager**: Credenciais centralizadas no AWS Secrets Manager via External Secrets Operator
+- **ECR Immutable Tags**: Tags imutáveis garantem auditabilidade GitOps
 
 ### 🏗️ Estrutura de Ambientes
 - **Ambientes separados**: `environments/dev/` e `environments/prod/` com configurações específicas
 - **Módulos reutilizáveis**: Mesmos módulos usados em ambos ambientes (DRY principle)
-- **Backends separados**: Estados S3 diferentes por ambiente (dev.tfstate vs prod.tfstate)
+- **Backends S3**: Estados remotos em ambos ambientes (dev e prod) com lock nativo
 - **Variáveis específicas**: `dev.tfvars` e `prod.tfvars` com configurações otimizadas
 - **Documentação completa**: README.md em `environments/` com guia de uso
+- **Novos módulos integrados**: github-oidc, external-secrets, secrets-manager em todos ambientes
 
 ### 💡 Benefícios
 - **Isolamento completo**: Dev e prod completamente separados
@@ -281,14 +304,18 @@ Sem isso, o HPA (evaluation) e o KEDA (analytics) escalariam para 5 réplicas e 
 
 Os `secret.yaml` da Fase 2 não foram para `gitops/`: `DATABASE_URL` e `MASTER_KEY` são credenciais, e tudo em `gitops/` é público no repositório.
 
-Como os Deployments consomem via `envFrom.secretRef`, os Secrets só precisam existir no namespace. `gitops/scripts/criar-secrets.sh` os cria a partir dos outputs do Terraform — nada é digitado à mão:
+Com a nova implementação, os secrets são gerenciados via **External Secrets Operator** e **AWS Secrets Manager**:
 
-```bash
-AUTH_DB="$(terraform output -json database_urls | jq -r '."auth-db"')"
-kubectl -n auth-service create secret generic auth-service-secret --from-literal=DATABASE_URL="$AUTH_DB" ...
-```
+1. **Terraform cria secrets** no AWS Secrets Manager (togglemaster/auth, togglemaster/flag, etc.)
+2. **External Secrets Operator** lê esses secrets via IRSA
+3. **Secrets do Kubernetes** são criados automaticamente no namespace correto
+4. **Zero manual**: Credenciais geradas automaticamente, nenhum comando manual necessário
 
-Se quiser 100% GitOps depois, o caminho é External Secrets Operator ou SealedSecrets — nenhum dos dois exige mudar os Deployments.
+Benefícios:
+- 100% GitOps: Nada precisa ser criado manualmente no cluster
+- Segurança: Credenciais ficam no AWS Secrets Manager, não no Git
+- Auditoria: Mudanças em secrets são rastreáveis via Terraform state
+- Escalabilidade: Fácil adicionar novos secrets conforme necessário
 
 ### O script de placeholders
 
