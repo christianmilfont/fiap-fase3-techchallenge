@@ -95,3 +95,12 @@ module "ecr" {
   repository_names = var.ecr_repository_names
   tags             = local.tags
 }
+
+module "github_oidc" {
+  source = "./modules/github-oidc"
+
+  project_name        = local.name
+  github_repositories = var.github_repositories
+  ecr_repository_arns = module.ecr.repository_arns
+  tags                = local.tags
+}

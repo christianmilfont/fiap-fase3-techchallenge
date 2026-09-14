@@ -92,3 +92,8 @@ output "argocd_server_url_command" {
   description = "Comando para descobrir o DNS do LoadBalancer da UI do ArgoCD."
   value       = var.enable_argocd ? module.argocd[0].server_url_command : null
 }
+
+output "github_actions_role_arn" {
+  description = "ARN da IAM role para GitHub Actions (OIDC)."
+  value       = module.github_oidc.github_actions_role_arn
+}
