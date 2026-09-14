@@ -60,7 +60,7 @@ Hoje a pipeline CI/CD precisa de `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` est
 
 ### 🚨 **Problema (CRÍTICO - BLOQUEIA DEPLOY)**
 
-**Status**: 🔴 BLOQUEADOR  
+**Status**: � **EM ANDAMENTO**  
 **Prioridade**: 🔴 ALTA  
 **Origem**: Feedback do responsável pela pipeline CI/CD
 
