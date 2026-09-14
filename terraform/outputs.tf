@@ -102,3 +102,8 @@ output "eso_role_arn" {
   description = "ARN da IAM role para External Secrets Operator (IRSA)."
   value       = module.external_secrets.eso_role_arn
 }
+
+output "app_secret_arns" {
+  description = "ARNs dos secrets do AWS Secrets Manager (map: serviço => arn)."
+  value       = module.secrets_manager.app_secret_arns
+}

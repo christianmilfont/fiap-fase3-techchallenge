@@ -111,6 +111,19 @@ module "external_secrets" {
   project_name           = local.name
   eks_oidc_provider_url  = module.eks.oidc_issuer_url
   service_account_subject = var.eso_service_account_subject
-  secret_arns            = var.eso_secret_arns
+  secret_arns            = module.secrets_manager.app_secret_arns
   tags                   = local.tags
+}
+
+module "secrets_manager" {
+  source = "./modules/secrets-manager"
+
+  project_name          = local.name
+  secret_prefix         = var.secret_prefix
+  recovery_window_in_days = var.recovery_window_in_days
+  auth_database_url     = "postgres://${module.rds.usernames["auth-db"]}:${urlencode(module.rds.passwords["auth-db"])}@${module.rds.addresses["auth-db"]}:5432/${module.rds.db_names["auth-db"]}"
+  flag_database_url     = "postgres://${module.rds.usernames["flag-db"]}:${urlencode(module.rds.passwords["flag-db"])}@${module.rds.addresses["flag-db"]}:5432/${module.rds.db_names["flag-db"]}"
+  targeting_database_url = "postgres://${module.rds.usernames["targeting-db"]}:${urlencode(module.rds.passwords["targeting-db"])}@${module.rds.addresses["targeting-db"]}:5432/${module.rds.db_names["targeting-db"]}"
+  redis_url             = "redis://${module.elasticache.primary_endpoint_address}:${module.elasticache.port}"
+  tags                  = local.tags
 }

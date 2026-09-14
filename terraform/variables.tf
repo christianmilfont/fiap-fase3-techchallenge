@@ -208,8 +208,14 @@ variable "eso_service_account_subject" {
   default     = "system:serviceaccount:external-secrets:external-secrets"
 }
 
-variable "eso_secret_arns" {
-  description = "ARNs dos secrets do AWS Secrets Manager que o ESO pode acessar (será preenchido após criar o módulo secrets-manager)."
-  type        = list(string)
-  default     = []
+variable "secret_prefix" {
+  description = "Prefixo para os nomes dos secrets no Secrets Manager."
+  type        = string
+  default     = "togglemaster"
+}
+
+variable "recovery_window_in_days" {
+  description = "Dias de recuperação antes de permitir delete imediato (0 permite delete imediato para labs)."
+  type        = number
+  default     = 0
 }
