@@ -201,3 +201,15 @@ variable "enable_eks" {
   type        = bool
   default     = true
 }
+
+variable "eso_service_account_subject" {
+  description = "Subject do ServiceAccount do External Secrets Operator (formato: system:serviceaccount:namespace:serviceaccount)."
+  type        = string
+  default     = "system:serviceaccount:external-secrets:external-secrets"
+}
+
+variable "eso_secret_arns" {
+  description = "ARNs dos secrets do AWS Secrets Manager que o ESO pode acessar (será preenchido após criar o módulo secrets-manager)."
+  type        = list(string)
+  default     = []
+}

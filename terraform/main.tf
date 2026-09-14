@@ -104,3 +104,13 @@ module "github_oidc" {
   ecr_repository_arns = module.ecr.repository_arns
   tags                = local.tags
 }
+
+module "external_secrets" {
+  source = "./modules/external-secrets"
+
+  project_name           = local.name
+  eks_oidc_provider_url  = module.eks.oidc_issuer_url
+  service_account_subject = var.eso_service_account_subject
+  secret_arns            = var.eso_secret_arns
+  tags                   = local.tags
+}

@@ -97,3 +97,8 @@ output "github_actions_role_arn" {
   description = "ARN da IAM role para GitHub Actions (OIDC)."
   value       = module.github_oidc.github_actions_role_arn
 }
+
+output "eso_role_arn" {
+  description = "ARN da IAM role para External Secrets Operator (IRSA)."
+  value       = module.external_secrets.eso_role_arn
+}
