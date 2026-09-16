@@ -76,7 +76,7 @@ resource "aws_iam_role" "nodes" {
 
 # IRSA - IAM Role para pods (service accounts)
 resource "aws_iam_role" "pod_role" {
-  count = var.enable_irsa_pod_role && var.enable_trust_conditions && !var.enable_service_irsa_roles ? 1 : 0
+  count = var.enable_irsa_pod_role && var.enable_oidc_provider && !var.enable_service_irsa_roles ? 1 : 0
 
   name = "${var.cluster_name}-pod-role"
 
@@ -103,7 +103,7 @@ resource "aws_iam_role" "pod_role" {
 
 # IRSA - Política básica para pods (pode ser estendida por serviço)
 resource "aws_iam_role_policy" "pod_policy" {
-  count = var.enable_irsa_pod_role && !var.enable_service_irsa_roles ? 1 : 0
+  count = var.enable_irsa_pod_role && var.enable_oidc_provider && !var.enable_service_irsa_roles ? 1 : 0
 
   name = "${var.cluster_name}-pod-policy"
   role = aws_iam_role.pod_role[0].id
@@ -132,7 +132,10 @@ resource "aws_iam_role_policy" "pod_policy" {
 # IRSA - Service-specific roles
 # Analytics service role (SQS + DynamoDB)
 resource "aws_iam_role" "analytics_service" {
-  count = var.enable_service_irsa_roles && var.enable_trust_conditions ? 1 : 0
+  # Gated pelo OIDC provider, nao por trust conditions: o assume_role_policy
+  # abaixo referencia aws_iam_openid_connect_provider.this[0], que existe
+  # quando enable_oidc_provider = true. IRSA nao usa aws:SourceAccount.
+  count = var.enable_service_irsa_roles && var.enable_oidc_provider ? 1 : 0
 
   name = "${var.cluster_name}-analytics-service"
 
@@ -159,7 +162,9 @@ resource "aws_iam_role" "analytics_service" {
 }
 
 resource "aws_iam_role_policy" "analytics_service" {
-  count = var.enable_service_irsa_roles ? 1 : 0
+  # Precisa casar exatamente com o count da role: a policy referencia
+  # aws_iam_role.<role>[0].id e quebra com Invalid index se a role nao existir.
+  count = var.enable_service_irsa_roles && var.enable_oidc_provider ? 1 : 0
 
   name = "${var.cluster_name}-analytics-service-policy"
   role = aws_iam_role.analytics_service[0].id
@@ -189,7 +194,10 @@ resource "aws_iam_role_policy" "analytics_service" {
 
 # Evaluation service role (SQS)
 resource "aws_iam_role" "evaluation_service" {
-  count = var.enable_service_irsa_roles && var.enable_trust_conditions ? 1 : 0
+  # Gated pelo OIDC provider, nao por trust conditions: o assume_role_policy
+  # abaixo referencia aws_iam_openid_connect_provider.this[0], que existe
+  # quando enable_oidc_provider = true. IRSA nao usa aws:SourceAccount.
+  count = var.enable_service_irsa_roles && var.enable_oidc_provider ? 1 : 0
 
   name = "${var.cluster_name}-evaluation-service"
 
@@ -216,7 +224,9 @@ resource "aws_iam_role" "evaluation_service" {
 }
 
 resource "aws_iam_role_policy" "evaluation_service" {
-  count = var.enable_service_irsa_roles ? 1 : 0
+  # Precisa casar exatamente com o count da role: a policy referencia
+  # aws_iam_role.<role>[0].id e quebra com Invalid index se a role nao existir.
+  count = var.enable_service_irsa_roles && var.enable_oidc_provider ? 1 : 0
 
   name = "${var.cluster_name}-evaluation-service-policy"
   role = aws_iam_role.evaluation_service[0].id
@@ -237,7 +247,10 @@ resource "aws_iam_role_policy" "evaluation_service" {
 
 # KEDA operator role (SQS)
 resource "aws_iam_role" "keda_operator" {
-  count = var.enable_service_irsa_roles && var.enable_trust_conditions ? 1 : 0
+  # Gated pelo OIDC provider, nao por trust conditions: o assume_role_policy
+  # abaixo referencia aws_iam_openid_connect_provider.this[0], que existe
+  # quando enable_oidc_provider = true. IRSA nao usa aws:SourceAccount.
+  count = var.enable_service_irsa_roles && var.enable_oidc_provider ? 1 : 0
 
   name = "${var.cluster_name}-keda-operator"
 
@@ -264,7 +277,9 @@ resource "aws_iam_role" "keda_operator" {
 }
 
 resource "aws_iam_role_policy" "keda_operator" {
-  count = var.enable_service_irsa_roles ? 1 : 0
+  # Precisa casar exatamente com o count da role: a policy referencia
+  # aws_iam_role.<role>[0].id e quebra com Invalid index se a role nao existir.
+  count = var.enable_service_irsa_roles && var.enable_oidc_provider ? 1 : 0
 
   name = "${var.cluster_name}-keda-operator-policy"
   role = aws_iam_role.keda_operator[0].id
