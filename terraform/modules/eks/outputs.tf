@@ -36,15 +36,15 @@ output "oidc_issuer_url" {
 # Service-specific IRSA role outputs
 output "analytics_role_arn" {
   description = "ARN da IAM role para analytics-service (null se desabilitado)."
-  value       = var.enable_service_irsa_roles && var.enable_trust_conditions ? aws_iam_role.analytics_service[0].arn : null
+  value       = var.enable_service_irsa_roles && var.enable_oidc_provider ? aws_iam_role.analytics_service[0].arn : null
 }
 
 output "evaluation_role_arn" {
   description = "ARN da IAM role para evaluation-service (null se desabilitado)."
-  value       = var.enable_service_irsa_roles && var.enable_trust_conditions ? aws_iam_role.evaluation_service[0].arn : null
+  value       = var.enable_service_irsa_roles && var.enable_oidc_provider ? aws_iam_role.evaluation_service[0].arn : null
 }
 
 output "keda_role_arn" {
   description = "ARN da IAM role para keda-operator (null se desabilitado)."
-  value       = var.enable_service_irsa_roles && var.enable_trust_conditions ? aws_iam_role.keda_operator[0].arn : null
+  value       = var.enable_service_irsa_roles && var.enable_oidc_provider ? aws_iam_role.keda_operator[0].arn : null
 }
