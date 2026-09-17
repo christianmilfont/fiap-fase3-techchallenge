@@ -3,8 +3,13 @@ variable "project_name" {
   type        = string
 }
 
-variable "eks_oidc_provider_url" {
-  description = "URL do OIDC provider do cluster EKS."
+variable "eks_oidc_provider_arn" {
+  description = "ARN do IAM OIDC provider do cluster EKS. Sai do output do modulo eks — nao usar data source: no primeiro apply o provider ainda nao existe."
+  type        = string
+}
+
+variable "eks_oidc_provider_host" {
+  description = "Host do OIDC provider sem o prefixo https:// (ex: oidc.eks.us-east-1.amazonaws.com/id/XXXX). Sai de replace(module.eks.oidc_issuer_url, ...)."
   type        = string
 }
 

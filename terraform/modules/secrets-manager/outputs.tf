@@ -9,13 +9,7 @@ output "app_secret_arns" {
 }
 
 output "master_key" {
-  description = "MASTER_KEY gerado (sensitive)."
+  description = "MASTER_KEY gerado (sensitive). Tambem usado como SERVICE_API_KEY pelo evaluation."
   value       = random_password.master_key.result
-  sensitive   = true
-}
-
-output "service_api_key" {
-  description = "SERVICE_API_KEY gerado (sensitive)."
-  value       = random_password.service_api_key.result
   sensitive   = true
 }

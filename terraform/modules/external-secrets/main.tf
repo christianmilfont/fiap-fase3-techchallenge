@@ -2,11 +2,6 @@
 # Permite que o External Secrets Operator leia secrets do AWS Secrets Manager via IRSA
 # Elimina a necessidade de secrets manuais no Kubernetes
 
-# Data source para obter o OIDC provider ARN do cluster EKS
-data "aws_iam_openid_connect_provider" "eks" {
-  url = var.eks_oidc_provider_url
-}
-
 # IAM Role para External Secrets Operator via IRSA
 resource "aws_iam_role" "eso" {
   name = "${var.project_name}-eso"
@@ -16,11 +11,11 @@ resource "aws_iam_role" "eso" {
     Statement = [{
       Effect    = "Allow"
       Action    = "sts:AssumeRoleWithWebIdentity"
-      Principal = { Federated = data.aws_iam_openid_connect_provider.eks.arn }
+      Principal = { Federated = var.eks_oidc_provider_arn }
       Condition = {
         StringEquals = {
-          "${replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = var.service_account_subject
-          "${replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          "${var.eks_oidc_provider_host}:sub" = var.service_account_subject
+          "${var.eks_oidc_provider_host}:aud" = "sts.amazonaws.com"
         }
       }
     }]
