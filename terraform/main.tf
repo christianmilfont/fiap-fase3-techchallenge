@@ -104,7 +104,7 @@ module "github_oidc" {
 
   project_name        = local.name
   github_repositories = var.github_repositories
-  ecr_repository_arns = module.ecr.repository_arns
+  ecr_repository_arns = values(module.ecr.repository_arns)
   tags                = local.tags
 }
 
@@ -114,7 +114,7 @@ module "external_secrets" {
   project_name           = local.name
   eks_oidc_provider_url  = module.eks.oidc_issuer_url
   service_account_subject = var.eso_service_account_subject
-  secret_arns            = module.secrets_manager.app_secret_arns
+  secret_arns            = values(module.secrets_manager.app_secret_arns)
   tags                   = local.tags
 }
 
