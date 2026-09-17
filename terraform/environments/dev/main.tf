@@ -119,7 +119,8 @@ module "external_secrets" {
   source = "../../modules/external-secrets"
 
   project_name            = local.name
-  eks_oidc_provider_url   = var.enable_eks ? module.eks[0].oidc_issuer_url : ""
+  eks_oidc_provider_arn   = var.enable_eks ? module.eks[0].oidc_provider_arn : ""
+  eks_oidc_provider_host  = var.enable_eks ? replace(module.eks[0].oidc_issuer_url, "https://", "") : ""
   service_account_subject = var.eso_service_account_subject
   secret_arns             = values(module.secrets_manager.app_secret_arns)
   tags                    = local.tags
