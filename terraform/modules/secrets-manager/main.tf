@@ -2,14 +2,8 @@
 # Armazena DATABASE_URL, MASTER_KEY, SERVICE_API_KEY, etc.
 # Elimina a necessidade de secrets manuais no Kubernetes
 
-# Generate random passwords for MASTER_KEY and SERVICE_API_KEY
+# Generate random password for MASTER_KEY (usado como SERVICE_API_KEY tambem)
 resource "random_password" "master_key" {
-  length           = 64
-  special          = false
-  override_special = ""
-}
-
-resource "random_password" "service_api_key" {
   length           = 64
   special          = false
   override_special = ""
@@ -73,6 +67,9 @@ resource "aws_secretsmanager_secret_version" "evaluation" {
   secret_id = aws_secretsmanager_secret.evaluation.id
   secret_string = jsonencode({
     REDIS_URL       = var.redis_url
-    SERVICE_API_KEY = random_password.service_api_key.result
+    # Mesma chave do auth: o evaluation chama /validate no auth-service, que
+    # valida contra o MASTER_KEY que ele proprio le. Se forem diferentes, a
+    # chamada falha — a "chave de servico" e a master key tem que ser a mesma.
+    SERVICE_API_KEY = random_password.master_key.result
   })
 }
