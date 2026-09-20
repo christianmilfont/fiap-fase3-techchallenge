@@ -250,18 +250,22 @@ Benefícios:
 ## Ordem de execução
 
 ```bash
+# 1. security scanning (Checkov) - pode ser antes do bootstrap, já que é um scan estático
+cd terraform
+checkov -d . --config-file .checkov.yaml
+
 # 1. bucket do estado (uma vez só)
 cd terraform/bootstrap
 terraform init
 terraform apply -var="project_name=togglemaster-prod"
-ADICIONAR ARQUIVO BACKEND.HCL COM AS KEYS REFERENTES AOS OUTPUTS DO BUCKET
+
+- ADICIONAR ARQUIVO BACKEND.HCL COM AS KEYS REFERENTES AOS OUTPUTS DO BUCKET
+
 EXEMPLO:
 bucket = "togglemaster-prod-XXXXX"
 key = "togglemaster-prod/infra.tfstate"
 region = "us-east-1"
 
-# 2. security scanning (Checkov)
-cd .. && checkov -d . --config-file .checkov.yaml
 
 # 3. infra (Terraform)
 cd terraform/environments/prod ou dev
